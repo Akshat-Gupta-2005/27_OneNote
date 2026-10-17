@@ -1,0 +1,23 @@
+{
+  "name": "onenote-clone",
+  "version": "1.0.0",
+  "description": "A OneNote-style notes web app with notebooks, sections, pages, freeform canvas, ink and SQLite persistence.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test --test-concurrency=1 \"tests/*.test.mjs\"",
+    "backup": "node scripts/backup.mjs",
+    "docs:arch": "node scripts/build-architecture.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

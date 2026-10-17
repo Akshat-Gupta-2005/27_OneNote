@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OneNote Clone</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%237719aa'/%3E%3Cpath d='M9 23V9h2.6l7 9.6V9H21v14h-2.5l-7.1-9.7V23z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/app.css">
+  <script>
+    // Apply the cached appearance before first paint (theme.js writes oc.appearance; the server's
+    // settings.appearance is the source of truth and is re-applied once loaded).
+    try {
+      var r = document.documentElement;
+      var a = JSON.parse(localStorage.getItem('oc.appearance') || 'null');
+      if (a) {
+        r.dataset.theme = a.followSystem ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : a.base;
+        if (!a.followSystem) for (var k in a.tokens) r.style.setProperty('--' + k, a.tokens[k]);
+        for (var d in a.attrs) r.dataset[d] = a.attrs[d];
+        if (a.font) r.style.setProperty('--font-ui', a.font);
+      } else {
+        var t = JSON.parse(localStorage.getItem('oc.theme') || '"dark"');
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        r.dataset.theme = t;
+      }
+    } catch (e) {}
+  </script>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ===== Title bar ===== -->
+  <header class="titlebar">
+    <div class="tb-left">
+      <button class="tb-btn" id="navBack" data-icon="back" title="Back"></button>
+      <button class="tb-btn" id="navFwd" data-icon="forward" title="Forward"></button>
+    </div>
+    <div class="tb-center">
+      <span class="app-name">OneNote Clone</span>
+      <span class="save-status" id="saveStatus"></span>
+    </div>
+    <div class="tb-right">
+      <button class="tb-user" id="userName" title="Change display name"></button>
+    </div>
+  </header>
+
+  <!-- ===== Ribbon ===== -->
+  <div class="ribbon" id="ribbon">
+    <div class="ribbon-tabs" role="tablist">
+      <button class="rtab" data-tab="home" role="tab">Home</button>
+      <button class="rtab" data-tab="insert" role="tab">Insert</button>
+      <button class="rtab" data-tab="draw" role="tab">Draw</button>
+      <button class="rtab" data-tab="view" role="tab">View</button>
+      <button class="rtab" data-tab="theme" role="tab">Theme</button>
+      <button class="rtab" data-tab="help" role="tab">Help</button>
+      <div class="rtabs-right">
+        <button class="rb" id="syncIcon" data-icon="cloud" title="All changes saved"></button>
+        <button class="rb wide" data-cmd="share" data-icon="share" title="Copy a link to this page"><span>Share</span></button>
+        <button class="rb" data-cmd="fullPage" data-icon="expand" title="Full page view"></button>
+        <button class="rb" data-drop="appMenu" data-icon="more" title="More options"></button>
+      </div>
+    </div>
+
+    <div class="ribbon-body">
+      <!-- Home -->
+      <div class="ribbon-panel" data-panel="home">
+        <div class="rgroup">
+          <button class="rb" data-cmd="undo" data-icon="undo" title="Undo (Ctrl+Z)"></button>
+          <button class="rb" data-cmd="redo" data-icon="redo" title="Redo (Ctrl+Y)"></button>
+          <button class="rb" data-cmd="paste" data-icon="paste" title="Paste (Ctrl+V)"></button>
+        </div>
+        <div class="rgroup">
+          <div class="combo font">
+            <input id="fontName" value="Calibri" spellcheck="false" aria-label="Font" autocomplete="off">
+            <button class="combo-btn" data-drop="font" data-icon="chevronDown" title="Font"></button>
+          </div>
+          <div class="combo size">
+            <input id="fontSize" value="11" spellcheck="false" aria-label="Font size" autocomplete="off">
+            <button class="combo-btn" data-drop="size" data-icon="chevronDown" title="Font size"></button>
+          </div>
+        </div>
+        <div class="rgroup">
+          <button class="rb glyph" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="rb glyph" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button class="rb glyph" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <div class="split">
+            <button class="rb color" data-cmd="highlight" data-icon="highlight" title="Highlight (Ctrl+Alt+H)"><span class="cbar" id="hlBar"></span></button>
+            <button class="rb drop" data-drop="highlight" data-icon="chevronDown" title="Highlight color"></button>
+          </div>
+          <div class="split">
+            <button class="rb color" data-cmd="fontColor" data-icon="fontColor" title="Font color"><span class="cbar" id="fcBar"></span></button>
+            <button class="rb drop" data-drop="fontColor" data-icon="chevronDown" title="Font color"></button>
+          </div>
+          <button class="rb" data-cmd="painter" data-icon="painter" title="Format painter"></button>
+          <button class="rb" data-cmd="clearFormat" data-icon="clearFormat" title="Clear formatting"></button>
+          <button class="rb drop" data-drop="moreFormat" data-icon="chevronDown" title="More formatting"></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb" data-cmd="bullets" data-icon="bullets" title="Bullets (Ctrl+.)"></button>
+          <button class="rb" data-cmd="numbering" data-icon="numbering" title="Numbering (Ctrl+/)"></button>
+          <button class="rb" data-cmd="outdent" data-icon="outdent" title="Decrease indent (Shift+Tab)"></button>
+          <button class="rb" data-cmd="indent" data-icon="indent" title="Increase indent (Tab)"></button>
+          <button class="rb drop" data-drop="align" data-icon="chevronDown" title="Paragraph alignment"></button>
+        </div>
+        <div class="rgroup">
+          <div class="split">
+            <button class="rb todo-btn" data-cmd="todo" data-icon="todo" title="To Do tag (Ctrl+1)"></button>
+            <button class="rb drop" data-drop="tags" data-icon="chevronDown" title="More tags"></button>
+          </div>
+        </div>
+        <div class="rgroup">
+          <button class="styles-btn" data-drop="styles" title="Styles"><span id="styleLabel">Normal</span></button>
+        </div>
+        <div class="rgroup">
+          <div class="split">
+            <button class="rb wide" data-cmd="dictate" data-icon="mic" id="dictateBtn" title="Dictate with your microphone"><span>Dictate</span></button>
+            <button class="rb drop" data-drop="dictate" data-icon="chevronDown" title="Dictation language"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Insert -->
+      <div class="ribbon-panel" data-panel="insert">
+        <div class="rgroup">
+          <button class="rb wide" data-drop="templates" data-icon="copy" title="Insert meeting notes, a journal, a project plan or a weekly planner into this page"><span>Templates</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-drop="table" data-icon="table" title="Insert a table"><span>Table</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="picture" data-icon="image" title="Insert a picture"><span>Picture</span></button>
+          <button class="rb wide" data-cmd="file" data-icon="paperclip" title="Attach a file"><span>File</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="link" data-icon="link" title="Insert a link (Ctrl+K)"><span>Link</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="date" data-icon="calendar" title="Insert date (Alt+Shift+D)"><span>Date</span></button>
+          <button class="rb wide" data-cmd="time" data-icon="clock" title="Insert time (Alt+Shift+T)"><span>Time</span></button>
+          <button class="rb wide" data-cmd="datetime" data-icon="calendarClock" title="Insert date &amp; time (Alt+Shift+F)"><span>Date &amp; Time</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="hr" data-icon="hr" title="Insert a horizontal line"><span>Line</span></button>
+          <button class="rb wide" data-cmd="newContainer" data-icon="plusBox" title="Add a new note container"><span>Note container</span></button>
+        </div>
+      </div>
+
+      <!-- Draw -->
+      <div class="ribbon-panel" data-panel="draw">
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="modeType" data-icon="cursor" title="Type (Esc)"><span>Type</span></button>
+          <button class="rb wide" data-cmd="modeEraser" data-icon="eraser" title="Eraser"><span>Eraser</span></button>
+        </div>
+        <div class="rgroup">
+          <div class="split">
+            <button class="rb color" data-cmd="modePen" data-icon="pen" title="Pen"><span class="cbar" id="penBar"></span></button>
+            <button class="rb drop" data-drop="pen" data-icon="chevronDown" title="Pen color and thickness"></button>
+          </div>
+          <div class="split">
+            <button class="rb color" data-cmd="modeHl" data-icon="highlight" title="Highlighter"><span class="cbar" id="inkHlBar"></span></button>
+            <button class="rb drop" data-drop="inkHl" data-icon="chevronDown" title="Highlighter color and thickness"></button>
+          </div>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="clearInk" data-icon="trash" title="Remove all ink from this page"><span>Clear ink</span></button>
+        </div>
+      </div>
+
+      <!-- View -->
+      <div class="ribbon-panel" data-panel="view">
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="togglePanes" data-icon="sidebar" title="Show or hide navigation panes"><span>Navigation</span></button>
+          <button class="rb wide" data-cmd="fullPage" data-icon="expand" title="Full page view"><span>Full page</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-drop="lines" data-icon="lines" title="Rule lines"><span>Rule lines</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb" data-cmd="zoomOut" data-icon="zoomOut" title="Zoom out"></button>
+          <button class="rb zoom-label" data-cmd="zoomReset" id="zoomLabel" title="Reset zoom">100%</button>
+          <button class="rb" data-cmd="zoomIn" data-icon="zoomIn" title="Zoom in"></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="print" data-icon="printer" title="Print this page"><span>Print</span></button>
+          <button class="rb wide" data-cmd="exportPage" data-icon="download" title="Download this page as HTML"><span>Export page</span></button>
+        </div>
+      </div>
+
+      <!-- Theme -->
+      <div class="ribbon-panel" data-panel="theme">
+        <div class="rgroup">
+          <button class="rb wide scheme-btn" data-drop="schemes" title="All color schemes" aria-label="Color scheme">
+            <span class="scheme-dot" id="schemeDot"></span><span id="schemeName">Classic Dark</span>
+          </button>
+          <div class="scheme-quick" id="schemeQuick" role="group" aria-label="Quick color schemes"></div>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="themeNew" data-icon="palette" title="Make your own color scheme"><span>Create theme</span></button>
+          <button class="rb wide" data-cmd="themeEdit" data-icon="edit" id="themeEditBtn" title="Edit the current custom theme"><span>Edit</span></button>
+          <button class="rb wide" data-cmd="themeImport" data-icon="upload" title="Import a theme code"><span>Import</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide look-label" data-drop="looks" data-icon="brush" title="Look presets"><span id="lookName">Look: Classic</span></button>
+          <button class="rb wide" data-drop="look-density" data-icon="rows" title="Density"><span>Density</span></button>
+          <button class="rb wide" data-drop="look-corners" data-icon="corner" title="Corners"><span>Corners</span></button>
+          <button class="rb wide" data-drop="look-font" data-icon="type" title="Interface font"><span>Font</span></button>
+          <button class="rb wide" data-drop="look-page" data-icon="pageSheet" title="Page style"><span>Page</span></button>
+          <button class="rb wide" data-drop="look-tabs" data-icon="bookmark" title="Section tab style"><span>Section tabs</span></button>
+        </div>
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="themeReset" data-icon="restore" title="Back to Classic Dark and the Classic look"><span>Reset</span></button>
+        </div>
+      </div>
+
+      <!-- Help -->
+      <div class="ribbon-panel" data-panel="help">
+        <div class="rgroup">
+          <button class="rb wide" data-cmd="shortcuts" data-icon="keyboard"><span>Keyboard shortcuts</span></button>
+          <button class="rb wide" data-cmd="about" data-icon="info"><span>About</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Main ===== -->
+  <div class="main">
+    <nav class="rail">
+      <button class="rail-btn" data-pane="notebooks" data-icon="library" title="Notebooks"></button>
+      <button class="rail-btn" data-pane="search" data-icon="search" title="Search (Ctrl+E)"></button>
+      <button class="rail-btn" data-pane="recent" data-icon="clock" title="Recent notes"></button>
+      <div class="rail-spacer"></div>
+      <button class="rail-btn" data-pane="trash" data-icon="trash" title="Deleted pages"></button>
+    </nav>
+
+    <aside class="sidepanel" id="sidepanel">
+      <!-- Notebooks view -->
+      <div class="view" data-view="notebooks">
+        <div class="nav-head">
+          <button class="nb-switch" id="nbSwitch" title="Switch notebook">
+            <span class="nb-icon" id="nbIcon"></span>
+            <span class="nb-name" id="nbName">Notebook</span>
+            <span class="nb-chev" data-icon="chevronDown"></span>
+          </button>
+          <div class="nav-head-pages">
+            <button class="rb" id="sortBtn" data-icon="sort" title="Sort pages"></button>
+          </div>
+        </div>
+        <div class="panes">
+          <div class="sections-pane">
+            <ul class="list" id="sectionList" role="listbox" aria-label="Sections"></ul>
+            <div class="pane-foot"><button class="add-btn" id="addSection"><span data-icon="plus"></span>Add section</button></div>
+          </div>
+          <div class="pages-pane">
+            <ul class="list" id="pageList" role="listbox" aria-label="Pages"></ul>
+            <div class="pane-foot split-foot">
+              <button class="add-btn" id="addPage"><span data-icon="plus"></span>Add page</button>
+              <button class="add-more" id="addPageMenu" data-icon="chevronDown" title="New page from a template" aria-label="New page from a template"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search view -->
+      <div class="view" data-view="search">
+        <div class="view-head">
+          <div class="search-box">
+            <span data-icon="search"></span>
+            <input id="searchInput" type="search" placeholder="Search notes" autocomplete="off">
+          </div>
+          <div class="search-scope">
+            <button class="chip" data-scope="all">All notebooks</button>
+            <button class="chip" data-scope="notebook">Current notebook</button>
+          </div>
+        </div>
+        <ul class="list results" id="searchResults"></ul>
+      </div>
+
+      <!-- Recent view -->
+      <div class="view" data-view="recent">
+        <div class="view-head"><h2 class="view-title">Recent notes</h2></div>
+        <ul class="list results" id="recentList"></ul>
+      </div>
+
+      <!-- Trash view -->
+      <div class="view" data-view="trash">
+        <div class="view-head">
+          <h2 class="view-title">Deleted pages</h2>
+          <p class="view-sub">Pages are kept for 60 days, then deleted for good.</p>
+          <button class="btn small" id="emptyTrash">Empty deleted pages</button>
+        </div>
+        <ul class="list results" id="trashList"></ul>
+      </div>
+    </aside>
+
+    <main class="canvas" id="canvas">
+      <div class="page-inner" id="pageInner">
+        <div class="page-head">
+          <div class="page-title" id="pageTitle" contenteditable="plaintext-only" spellcheck="true" data-placeholder="Untitled page"></div>
+          <div class="page-meta"><span id="pageDate"></span><span id="pageTime"></span></div>
+        </div>
+        <svg class="ink-layer" id="inkLayer" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="img-handle" id="imgHandle" hidden></div>
+      </div>
+      <div class="canvas-empty" id="canvasEmpty" hidden></div>
+    </main>
+  </div>
+</div>
+
+<input type="file" id="pictureInput" accept="image/*" multiple hidden>
+<input type="file" id="fileInput" multiple hidden>
+<input type="file" id="importInput" accept="application/json,.json" hidden>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
