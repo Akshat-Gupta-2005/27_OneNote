@@ -3,6 +3,7 @@ import { h, esc, toast, showMenu, fmtDate, fmtTime, fmtSize } from './ui.js';
 import { TodoView } from './todo.js';
 import { BoardView } from './board.js';
 import { TabView } from './tab.js';
+import { LinkLayer, normalizeLinks, snapToGuides, DIAGRAM_COLORS } from './diagram.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const OWN_MIME = 'application/x-onenote-clone';
@@ -145,6 +146,14 @@ export class PageEditor extends EventTarget {
     this.views = { todo: new TodoView({ onChange }), board: new BoardView({ onChange }), tab: new TabView({ onChange }) };
     this.view = null;
 
+    // Lines between containers on freeform pages (diagram.js). They are re-laid-out whenever the
+    // page extent is (any move, resize or typing), so they always follow their boxes.
+    this.links = new LinkLayer({
+      host: this.inner,
+      getBoxes: () => this.boxRects(),
+      onChange: () => { this.scheduleSave(); this.updateExtent(); }, // draw now, not next frame
+    });
+
     this.bind();
   }
 
@@ -156,23 +165,40 @@ export class PageEditor extends EventTarget {
   bind() {
     const { inner } = this;
 
-    // Click on empty canvas => new note container
+    // Empty canvas: a click starts a new note container; a drag draws a selection rectangle.
     inner.addEventListener('mousedown', (e) => {
+      // While containers are selected, Shift+click anywhere on another one adds it (or takes it out).
+      if (e.button === 0 && e.shiftKey && this.mode === 'type' && !this.structured) {
+        const b = e.target.closest?.('.nb');
+        if (b && !e.target.closest('.nb-handle, .nb-port, .nb-resize') && this.selectedBoxes().length) {
+          e.preventDefault();
+          this.toggleBlock(b);
+          return;
+        }
+      }
       if (e.button !== 0 || this.mode !== 'type' || e.target !== inner || this.structured) return;
       e.preventDefault();
-      this.deselectBlocks();
       this.hideImgHandle();
       if (!this.page) return;
-      const { x, y } = this.point(e);
-      this.focusBlock(this.addBlock({ x: Math.max(0, x - 8), y: Math.max(12, y - 10) }));
+      this.onCanvasDown(e);
     });
 
-    // Move / resize containers
-    inner.addEventListener('pointerdown', (e) => this.onBlockPointerDown(e));
+    // Move / resize containers, or drag a line out of one
+    inner.addEventListener('pointerdown', (e) => {
+      const port = e.target.closest?.('.nb-port');
+      if (port && e.button === 0 && this.mode === 'type') this.onPortDown(e, port);
+      else this.onBlockPointerDown(e);
+    });
+    inner.addEventListener('load', (e) => { if (e.target.tagName === 'IMG') this.queueExtent(); }, true);
 
     inner.addEventListener('focusout', (e) => {
       if (e.target.classList?.contains('nb-handle')) {
-        e.target.parentElement.classList.remove('selected');
+        // Focus moving between selected containers (Shift+click) or into a menu keeps the selection.
+        const to = e.relatedTarget;
+        if (to && (to.classList?.contains('nb-handle') || to.closest?.('.menu, .modal-overlay, .ribbon'))) return;
+        setTimeout(() => {
+          if (!this.inner.contains(document.activeElement?.closest?.('.nb-handle') || null) && !document.querySelector('.menu')) this.deselectBlocks();
+        }, 0);
         return;
       }
       const content = e.target.closest?.('.nb-content');
@@ -189,8 +215,9 @@ export class PageEditor extends EventTarget {
       if (to && (block.contains(to) || to.closest('.ribbon, .menu, .modal-overlay'))) return;
       setTimeout(() => {
         if (block.isConnected && !block.contains(document.activeElement) && this.isEmptyBlock(block)) {
-          block.remove();
+          block.remove(); // its lines go with it on the next layout
           this.scheduleSave();
+          this.queueExtent();
         }
       }, 0);
     });
@@ -208,13 +235,10 @@ export class PageEditor extends EventTarget {
     inner.addEventListener('keydown', (e) => this.onKeyDown(e));
     inner.addEventListener('click', (e) => this.onClick(e));
     inner.addEventListener('contextmenu', (e) => {
-      const handle = e.target.closest('.nb-handle');
+      const handle = e.target.closest('.nb-handle, .nb-port');
       if (!handle) return;
       e.preventDefault();
-      const block = handle.parentElement;
-      showMenu({ x: e.clientX, y: e.clientY }, [
-        { label: 'Delete note container', icon: 'trash', danger: true, onClick: () => { block.remove(); this.scheduleSave(); } },
-      ]);
+      this.boxMenu(handle.closest('.nb'), { x: e.clientX, y: e.clientY });
     });
 
     // Title
@@ -308,10 +332,13 @@ export class PageEditor extends EventTarget {
       this.lines = 'none';
       this.strokes = [];
       this.view.mount(this.inner, this.inner.querySelector('.page-head'), data, page.id);
+      this.links.set([]);
+      this.links.render();
     } else {
       this.lines = data.lines || 'none';
       this.strokes = Array.isArray(data.ink) ? data.ink : [];
       for (const b of data.blocks || []) this.addBlock(b);
+      this.links.set(normalizeLinks(data.links, new Set(this.blocks().map((b) => b.dataset.id))));
     }
 
     this.titleEl.textContent = page.title || '';
@@ -338,6 +365,8 @@ export class PageEditor extends EventTarget {
     this.unmountView();
     this.strokes = [];
     this.renderInk();
+    this.links.set([]);
+    this.links.render();
     this.inner.hidden = true;
     this.emptyEl.replaceChildren(...nodes);
     this.emptyEl.hidden = false;
@@ -379,27 +408,32 @@ export class PageEditor extends EventTarget {
   // ================= saving =================
   serialize() {
     if (this.structured) return this.view.serialize();
-    const blocks = [];
-    for (const b of this.blocks()) {
-      if (this.isEmptyBlock(b)) continue;
-      blocks.push({
-        id: b.dataset.id,
-        x: Math.round(parseFloat(b.style.left) || 0),
-        y: Math.round(parseFloat(b.style.top) || 0),
-        w: b.style.width ? Math.round(parseFloat(b.style.width)) : null,
-        html: b.querySelector('.nb-content').innerHTML,
-      });
-    }
-    return { v: 1, lines: this.lines, blocks, ink: this.strokes };
+    const blocks = this.blocks().filter((b) => !this.isEmptyBlock(b)).map((b) => this.blockSpec(b));
+    // Only lines between saved containers (an empty box being typed into isn't saved yet).
+    const kept = new Set(blocks.map((b) => b.id));
+    const links = this.links.links.filter((l) => kept.has(l.from) && kept.has(l.to)).map((l) => ({ ...l }));
+    return { v: 1, lines: this.lines, blocks, ink: this.strokes, ...(links.length ? { links } : {}) };
+  }
+
+  /** A container as stored: position, width, HTML and (only when set) its style. */
+  blockSpec(b) {
+    const style = this.blockStyle(b);
+    return {
+      id: b.dataset.id,
+      x: Math.round(parseFloat(b.style.left) || 0),
+      y: Math.round(parseFloat(b.style.top) || 0),
+      w: b.style.width ? Math.round(parseFloat(b.style.width)) : null,
+      html: b.querySelector('.nb-content').innerHTML,
+      ...(style ? { style } : {}),
+    };
   }
 
   plainText() {
     if (this.structured) return this.view.plainText();
-    return this.blocks()
+    const text = this.blocks()
       .sort((a, b) => a.offsetTop - b.offsetTop || a.offsetLeft - b.offsetLeft)
-      .map((b) => b.querySelector('.nb-content').innerText.trim())
-      .filter(Boolean)
-      .join('\n\n');
+      .map((b) => b.querySelector('.nb-content').innerText.trim());
+    return [...text, ...this.links.links.map((l) => l.label)].filter(Boolean).join('\n\n');
   }
 
   snapshot() {
@@ -466,7 +500,7 @@ export class PageEditor extends EventTarget {
     for (const b of this.blocks()) b.remove();
   }
 
-  addBlock({ id, x = 60, y = 100, w = null, html = '' } = {}) {
+  addBlock({ id, x = 60, y = 100, w = null, html = '', style = null } = {}) {
     const block = h('div', { class: 'nb', dataset: { id: id || uid() } });
     block.style.left = `${x}px`;
     block.style.top = `${y}px`;
@@ -477,12 +511,209 @@ export class PageEditor extends EventTarget {
     const content = h('div', { class: 'nb-content', contenteditable: 'true', spellcheck: 'true' });
     content.innerHTML = html || EMPTY_HTML;
     block.append(
-      h('div', { class: 'nb-handle', tabindex: '-1', title: 'Drag to move · Delete to remove' }),
+      h('div', { class: 'nb-handle', tabindex: '-1', title: 'Drag to move · Shift+click to select several · right-click for style' }),
       content,
       h('div', { class: 'nb-resize', title: 'Drag to resize' }),
+      // Drag a dot onto another container to link them, or onto empty canvas for a new linked one.
+      ...['top', 'right', 'bottom', 'left'].map((side) => h('div', { class: 'nb-port', 'data-side': side, title: 'Drag to link' })),
     );
+    this.applyStyle(block, style);
     this.inner.append(block);
     return block;
+  }
+
+  // ---------- container style (border, colors, shape) ----------
+  blockStyle(b) {
+    const s = {};
+    for (const k of ['border', 'shape', 'color', 'fill']) if (b.dataset[k]) s[k] = b.dataset[k];
+    return Object.keys(s).length ? s : null;
+  }
+
+  /** Border 'auto' (shown once linked) and shape 'rect' are the defaults, so they aren't stored. */
+  applyStyle(b, s) {
+    const allowed = { border: ['always', 'never'], shape: ['rounded', 'pill'], color: DIAGRAM_COLORS, fill: DIAGRAM_COLORS };
+    for (const [k, values] of Object.entries(allowed)) {
+      if (values.includes(s?.[k])) b.dataset[k] = s[k];
+      else delete b.dataset[k];
+    }
+    b.style.setProperty('--nb-bc', b.dataset.color || '');
+    b.style.setProperty('--nb-fill', b.dataset.fill ? `color-mix(in srgb, ${b.dataset.fill} 20%, var(--canvas))` : '');
+  }
+
+  boxMenu(block, at) {
+    if (!block.classList.contains('selected')) this.selectBlock(block);
+    const group = this.selectedBoxes();
+    const cur = this.blockStyle(block) || {};
+    const set = (patch) => {
+      for (const b of group) this.applyStyle(b, { ...(this.blockStyle(b) || {}), ...patch });
+      this.scheduleSave();
+      this.queueExtent();
+    };
+    const pick = (field, options, current) => options.map(([v, label]) => ({ label, checked: current === v, onClick: () => set({ [field]: v }) }));
+    const n = group.length;
+    showMenu(at, [
+      n > 1 ? { heading: `${n} containers` } : null,
+      { label: 'Border', icon: 'corner', submenu: () => pick('border', [['auto', 'Auto (when linked)'], ['always', 'Always'], ['never', 'Never']], cur.border || 'auto') },
+      { label: 'Border color', icon: 'palette', submenu: [{ swatches: DIAGRAM_COLORS, value: cur.color ?? null, none: true, onPick: (c) => set({ color: c }) }] },
+      { label: 'Fill', icon: 'highlight', submenu: [{ swatches: DIAGRAM_COLORS, value: cur.fill ?? null, none: true, onPick: (c) => set({ fill: c }) }] },
+      { label: 'Shape', icon: 'rows', submenu: () => pick('shape', [['rect', 'Rectangle'], ['rounded', 'Rounded'], ['pill', 'Pill']], cur.shape || 'rect') },
+      { separator: true },
+      { label: n > 1 ? `Delete ${n} containers` : 'Delete note container', icon: 'trash', danger: true, hint: 'Del', onClick: () => this.deleteBlocks(group) },
+    ]);
+  }
+
+  /** Delete containers (and so their lines), with Undo that brings both back. */
+  deleteBlocks(blocks) {
+    if (!blocks.length) return;
+    const ids = new Set(blocks.map((b) => b.dataset.id));
+    const specs = blocks.map((b) => this.blockSpec(b));
+    const links = this.links.links.filter((l) => ids.has(l.from) || ids.has(l.to)).map((l) => ({ ...l }));
+    for (const b of blocks) b.remove();
+    this.scheduleSave();
+    this.updateExtent();
+    const page = this.page;
+    toast(blocks.length === 1 ? 'Deleted note container' : `Deleted ${blocks.length} note containers`, {
+      action: 'Undo',
+      timeout: 6000,
+      onAction: () => {
+        if (this.page !== page) return toast('That page is no longer open.');
+        for (const s of specs) this.addBlock(s);
+        for (const l of links) if (!this.links.find(l.id)) this.links.links.push(l);
+        this.scheduleSave();
+        this.updateExtent();
+      },
+    });
+  }
+
+  /** Where each container is, in page px (what the line layout and guides work from). */
+  boxRects() {
+    const map = new Map();
+    for (const b of this.blocks()) {
+      const r = b.getBoundingClientRect();
+      map.set(b.dataset.id, { x: parseFloat(b.style.left) || 0, y: parseFloat(b.style.top) || 0, w: r.width / this.zoom, h: r.height / this.zoom });
+    }
+    return map;
+  }
+
+  renderLinks() {
+    const linked = this.links.render();
+    for (const b of this.blocks()) b.classList.toggle('linked', linked.has(b.dataset.id));
+  }
+
+  // ---------- linking: drag a dot ----------
+  onPortDown(e, port) {
+    e.preventDefault();
+    e.stopPropagation();
+    const block = port.closest('.nb');
+    const from = block.dataset.id;
+    const side = port.dataset.side;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let moved = false;
+    let target = null;
+    const under = (ev) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const nb = el?.closest?.('.nb');
+      return { el, nb: nb && nb !== block && this.inner.contains(nb) ? nb : null, self: nb === block };
+    };
+    this.links.startTemp(from, side);
+    this.inner.classList.add('linking');
+    const move = (ev) => {
+      if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      moved = true;
+      const { nb } = under(ev);
+      if (nb !== target) {
+        target?.classList.remove('link-target');
+        target = nb;
+        target?.classList.add('link-target');
+      }
+      this.links.moveTemp(this.point(ev));
+    };
+    const up = (ev) => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      target?.classList.remove('link-target');
+      this.inner.classList.remove('linking');
+      this.links.endTemp();
+      if (!moved) return;
+      const { el, nb, self } = under(ev);
+      if (nb) {
+        this.links.add(from, nb.dataset.id);
+        return;
+      }
+      if (self || !el || !(el === this.inner || this.inner.contains(el)) || el.closest('.page-head')) return;
+      // Empty canvas: a new container there, already linked, with the caret in it. Left empty, it
+      // disappears on blur like any empty container, and its line with it.
+      const p = this.point(ev);
+      const nbNew = this.addBlock({ x: Math.max(0, p.x), y: Math.max(12, p.y) });
+      const r = nbNew.getBoundingClientRect();
+      const w = r.width / this.zoom;
+      const ht = r.height / this.zoom;
+      const [x, y] = { right: [p.x, p.y - ht / 2], left: [p.x - w, p.y - ht / 2], bottom: [p.x - w / 2, p.y], top: [p.x - w / 2, p.y - ht] }[side];
+      nbNew.style.left = `${Math.round(Math.max(0, x))}px`;
+      nbNew.style.top = `${Math.round(Math.max(12, y))}px`;
+      this.links.add(from, nbNew.dataset.id);
+      this.focusBlock(nbNew);
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  }
+
+  // ---------- empty canvas: click for a new container, drag to select ----------
+  onCanvasDown(e) {
+    const start = this.point(e);
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const additive = e.shiftKey;
+    let band = null;
+    let rect = null;
+    const move = (ev) => {
+      if (!band && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      if (!band) {
+        band = h('div', { class: 'marquee' });
+        this.inner.append(band);
+        if (!additive) this.deselectBlocks();
+      }
+      const p = this.point(ev);
+      rect = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+      Object.assign(band.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
+    };
+    const up = () => {
+      removeEventListener('mousemove', move);
+      removeEventListener('mouseup', up);
+      if (!band) {
+        this.deselectBlocks();
+        this.focusBlock(this.addBlock({ x: Math.max(0, start.x - 8), y: Math.max(12, start.y - 10) }));
+        return;
+      }
+      band.remove();
+      const rects = this.boxRects();
+      const hits = this.blocks().filter((b) => {
+        const r = rects.get(b.dataset.id);
+        return r.x < rect.x + rect.w && r.x + r.w > rect.x && r.y < rect.y + rect.h && r.y + r.h > rect.y;
+      });
+      for (const b of hits) b.classList.add('selected');
+      hits[0]?.querySelector('.nb-handle').focus({ preventScroll: true });
+    };
+    addEventListener('mousemove', move);
+    addEventListener('mouseup', up);
+  }
+
+  // ---------- alignment guides ----------
+  showGuides(gx, gy) {
+    this.guides ??= { v: h('div', { class: 'align-guide v' }), h: h('div', { class: 'align-guide h' }) };
+    for (const [el, at, prop] of [[this.guides.v, gx, 'left'], [this.guides.h, gy, 'top']]) {
+      if (at == null) el.remove();
+      else {
+        el.style[prop] = `${at}px`;
+        if (!el.isConnected) this.inner.append(el);
+      }
+    }
+  }
+
+  hideGuides() {
+    this.guides?.v.remove();
+    this.guides?.h.remove();
   }
 
   /**
@@ -532,6 +763,22 @@ export class PageEditor extends EventTarget {
     block.querySelector('.nb-handle').focus({ preventScroll: true });
   }
 
+  /** Shift+click: add a container to the selection, or take it out. */
+  toggleBlock(block) {
+    if (block.classList.contains('selected')) {
+      block.classList.remove('selected');
+      this.selectedBoxes()[0]?.querySelector('.nb-handle').focus({ preventScroll: true });
+    } else {
+      block.classList.add('selected');
+      block.querySelector('.nb-handle').focus({ preventScroll: true });
+    }
+  }
+
+  /** The selected note containers (not to be confused with selectedBlocks(): text lines under the caret). */
+  selectedBoxes() {
+    return this.blocks().filter((b) => b.classList.contains('selected'));
+  }
+
   deselectBlocks() {
     for (const b of this.inner.querySelectorAll('.nb.selected')) b.classList.remove('selected');
   }
@@ -555,29 +802,60 @@ export class PageEditor extends EventTarget {
     if ((!handle && !resizer) || e.button !== 0) return;
     e.preventDefault();
     const block = e.target.closest('.nb');
-    this.selectBlock(block);
+    if (handle && e.shiftKey) {
+      this.toggleBlock(block);
+      return;
+    }
+    // Dragging a selected container moves every selected one; otherwise it becomes the selection.
+    if (resizer || !block.classList.contains('selected')) this.selectBlock(block);
+    else block.querySelector('.nb-handle').focus({ preventScroll: true });
+    const group = resizer ? [block] : this.selectedBoxes();
+    const rects = this.boxRects();
+    const ids = new Set(group.map((b) => b.dataset.id));
+    const starts = group.map((b) => ({ b, x: parseFloat(b.style.left) || 0, y: parseFloat(b.style.top) || 0 }));
+    const own = group.map((b) => rects.get(b.dataset.id));
+    const bbox = {
+      x: Math.min(...own.map((r) => r.x)), y: Math.min(...own.map((r) => r.y)),
+      w: Math.max(...own.map((r) => r.x + r.w)) - Math.min(...own.map((r) => r.x)),
+      h: Math.max(...own.map((r) => r.y + r.h)) - Math.min(...own.map((r) => r.y)),
+    };
+    const others = [...rects].filter(([id]) => !ids.has(id)).map(([, r]) => r);
+    const minX = Math.min(...starts.map((s) => s.x));
+    const minY = Math.min(...starts.map((s) => s.y));
     const sx = e.clientX;
     const sy = e.clientY;
-    const ox = block.offsetLeft;
-    const oy = block.offsetTop;
     const ow = block.getBoundingClientRect().width / this.zoom;
     let moved = false;
     const move = (ev) => {
-      const dx = (ev.clientX - sx) / this.zoom;
-      const dy = (ev.clientY - sy) / this.zoom;
+      let dx = (ev.clientX - sx) / this.zoom;
+      let dy = (ev.clientY - sy) / this.zoom;
       if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
       if (resizer) {
         block.style.width = `${Math.round(Math.max(80, ow + dx))}px`;
         block.style.maxWidth = 'none';
       } else {
-        block.style.left = `${Math.round(Math.max(0, ox + dx))}px`;
-        block.style.top = `${Math.round(Math.max(12, oy + dy))}px`;
+        // Snap to other containers' edges and centers (Alt = no snapping), keep inside the page.
+        if (!ev.altKey && others.length) {
+          const s = snapToGuides({ ...bbox, x: bbox.x + dx, y: bbox.y + dy }, others, 6 / this.zoom);
+          dx += s.dx;
+          dy += s.dy;
+          this.showGuides(s.gx, s.gy);
+        } else {
+          this.hideGuides();
+        }
+        dx = Math.max(dx, -minX);
+        dy = Math.max(dy, 12 - minY);
+        for (const s of starts) {
+          s.b.style.left = `${Math.round(s.x + dx)}px`;
+          s.b.style.top = `${Math.round(s.y + dy)}px`;
+        }
       }
       this.queueExtent();
     };
     const up = () => {
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
+      this.hideGuides();
       if (moved) this.scheduleSave();
     };
     addEventListener('pointermove', move);
@@ -586,22 +864,24 @@ export class PageEditor extends EventTarget {
 
   onKeyDown(e) {
     if (e.target.classList?.contains('nb-handle')) {
+      const block = e.target.parentElement;
+      const group = block.classList.contains('selected') ? this.selectedBoxes() : [block];
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        e.target.parentElement.remove();
-        this.scheduleSave();
+        this.deleteBlocks(group);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        this.focusBlock(e.target.parentElement, true);
+        this.focusBlock(block, true);
       } else if (e.key.startsWith('Arrow') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Nudge the selected container: 1 px, or 10 px with Shift (the drag handle's keyboard twin).
+        // Nudge the selected containers: 1 px, or 10 px with Shift (the drag handle's keyboard twin).
         e.preventDefault();
-        const block = e.target.parentElement;
         const step = e.shiftKey ? 10 : 1;
         const dx = { ArrowLeft: -step, ArrowRight: step }[e.key] || 0;
         const dy = { ArrowUp: -step, ArrowDown: step }[e.key] || 0;
-        block.style.left = `${Math.max(0, (parseFloat(block.style.left) || 0) + dx)}px`;
-        block.style.top = `${Math.max(12, (parseFloat(block.style.top) || 0) + dy)}px`;
+        for (const b of group) {
+          b.style.left = `${Math.max(0, (parseFloat(b.style.left) || 0) + dx)}px`;
+          b.style.top = `${Math.max(12, (parseFloat(b.style.top) || 0) + dy)}px`;
+        }
         this.queueExtent();
         this.scheduleSave();
       }
@@ -674,6 +954,7 @@ export class PageEditor extends EventTarget {
     }
     this.inner.style.width = `${Math.ceil(maxX + 400)}px`;
     this.inner.style.height = `${Math.ceil(maxY + 400)}px`;
+    this.renderLinks();
   }
 
   setZoom(z) {

@@ -12,7 +12,7 @@ On Windows, double-click **`start.bat`**. It installs dependencies on first run,
 npm install
 npm start          # http://127.0.0.1:3000
 npm run dev        # same, restarts on server file changes
-npm test           # 121 browser + API tests against throwaway servers (uses your installed Chrome or Edge)
+npm test           # 130 browser + API tests against throwaway servers (uses your installed Chrome or Edge)
 npm run backup     # consistent snapshot of the database into backups/
 ```
 
@@ -33,6 +33,7 @@ Environment variables:
 - **Insert → Templates**: add Meeting notes, a Daily journal, a Project plan or a Weekly planner to the page you are on, below what is already there (Undo in the toast).
 - **Keyboard**: every shortcut is listed in Help → Keyboard shortcuts, including list navigation (↑/↓, Delete, F2, Enter), task, card and list moves (Alt+arrows), and nudging a selected container (arrows, Shift = 10 px).
 - **Freeform canvas**: click anywhere on a page to start a note container. Drag a container by its top bar, resize it from the top-right corner, and press `Delete` to remove a selected container.
+- **Diagrams**: hover a container and drag one of its dots onto another to link them, or onto empty space for a new linked container. Lines pick the facing sides and curve into place (n8n style), spread out when several leave one side, and follow as you move boxes. Right-click a line for arrows, curved / elbow / straight, dashed, color and a label (double-click also adds one). Drag a rectangle or Shift+click to select several containers; alignment guides snap while dragging (Alt turns them off); right-click a container's top bar for border, colors and shape.
 - **Rich text**: fonts, sizes, bold/italic/underline/strike, highlight and font colors, a format painter, bullets and numbering, indents, alignment, heading/quote/code styles, links and tables.
 - **Tags**: To Do (clickable checkbox), Important, Question, Critical, Idea and Contact.
 - **Insert**: pictures, file attachments, links, tables, date/time and horizontal lines. You can also paste or drag images and files straight onto the page.

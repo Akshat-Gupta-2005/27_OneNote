@@ -80,6 +80,8 @@ added, P5–P8 found and fixed. 0 tests in the repo at that point.
                               keyboard, #label @date quick-add (uses parseQuickAdd from todo.js)
       js/tab.js       717     Tab (money with people): data model + normalize, quick-entry parser, balances, item dialog
                               (qty/each/total), select → combine / mark paid, payment folds, drag + keyboard moves; Cards styles
+      js/diagram.js   381     lines between containers: routing (facing sides, spread ports, curve/elbow/straight), guide snapping,
+                              LinkLayer (SVG render, select, line menu, labels, delete + undo)
       js/theme.js     541     appearance: color math, 15 schemes, token derivation, looks, gallery, theme editor,
                               server persistence + first-paint cache
       js/ui.js        251     h() builder, menus/submenus/popovers, modal/prompt/confirm, toasts, date/size formatters
@@ -96,6 +98,7 @@ added, P5–P8 found and fixed. 0 tests in the repo at that point.
       templates.test.mjs 93   page vs insert templates, placement below notes, title rules, undo, refusal on boards
       board.test.mjs  188     Cards: lists, card dialog, badges, drag & drop, keyboard moves, persistence, search
       tab.test.mjs    188     Tab: parser, balances, qty/each/total dialog, combine/uncombine, partial + full payment, keyboard, persistence
+      diagram.test.mjs 283    layout maths, linking, drag-out, line menu + label, delete/undo, styles, multi-select, guides, reload
       shortcuts.test.mjs 273  every shortcut in Help (36), incl. list Delete/F2 (P13), container nudge
       moving.test.mjs 189     drag + Alt-arrow moves: planner tasks across views, Cards lists, Cards #label @date
       planner-order.test.mjs 126  + add boxes (open/close/blur), checked tasks last, tags A→Z
@@ -281,6 +284,25 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 | HTML export | Written | Not exercised | `exportHtml()` | |
 | Paid an amount not tied to items ("here's 200") | Deferred | Owner: "think for later". Would make balance and open items stop adding up | | |
 
+### Diagrams on freeform pages
+
+| Feature | Status | What it does | Lives in | Star |
+|---|---|---|---|---|
+| Link containers | Done 2026-10-29 | Hovering a container shows 4 small neutral dots just outside its edges (hidden while you type in it; the one you point at turns accent and grows); drag one onto another container to link them; once per pair (T) | `onPortDown()`, `LinkLayer.add()` | |
+| Lines lay themselves out (n8n style) | Done 2026-10-29 | Each line uses the two sides that face each other, re-picked as boxes move (T); several lines on one side spread out, ordered by where they go, so they don't cross (T); arrowheads follow the line | `routeLinks()`, `facingSides()` in `diagram.js` | ★ |
+| Line shapes | Done 2026-10-29 | Curved (default, leaves the side straight then bends), Elbow (right angles, rounded corners), Straight (T) | `curve()`, `elbow()` | |
+| Line menu | Done 2026-10-29 | Right-click a line: label, arrows (one end / both / none), shape, dashed, color, reverse, delete (T) | `LinkLayer.menu()` | |
+| Labels | Done 2026-10-29 | Double-click a line (or F2 on a selected one): a pill on its middle; searchable (T) | `editLabel()`, `plainText()` | |
+| Select and delete a line | Done 2026-10-29 | Click a line; Delete removes it with Undo (T) | `LinkLayer.remove()` | |
+| Drag out to a new box | Done 2026-10-29 | Drop a dot on empty canvas: a new linked container there, caret inside; left empty, it and its line disappear (T) | `onPortDown()` | ★ |
+| Multi-select | Done 2026-10-29 | Drag a rectangle on empty canvas (a plain click still makes a container) or Shift+click; selected boxes move together by drag or arrows; Delete removes all with Undo that also restores their lines (T) | `onCanvasDown()`, `toggleBlock()`, `deleteBlocks()` | |
+| Alignment guides | Done 2026-10-29 | While dragging, a guide shows when an edge or center lines up with another box (within 6 px) and it snaps; Alt turns snapping off (T) | `snapToGuides()`, `showGuides()` | |
+| Container style | Done 2026-10-29 | Right-click a container's top bar: border (auto when linked / always / never), border color, fill (theme-tinted), shape (rectangle / rounded / pill); applies to all selected (T) | `boxMenu()`, `applyStyle()` | |
+| Delete a container has Undo | Done 2026-10-29 | Delete key or menu, one or several; Undo restores them and their lines (T) | `deleteBlocks()` | |
+| Persistence | Done 2026-10-29 | Lines, labels and styles survive a reload; pages without links load as before (T) | `serialize()`, `normalizeLinks()` | |
+| Lines in HTML export | Deferred | Export lists containers one after another, so lines are left out | | |
+| Keyboard way to create a line | Deferred | Lines are made with the mouse only | | |
+
 ### Keyboard
 
 | Feature | Status | What it does | Lives in | Star |
@@ -337,7 +359,7 @@ data) unless stated.
 
 | What | Result | How |
 |---|---|---|
-| Tests in repo | **121 pass, 0 fail**, 12 suites | `npm test`, 2026-10-29 (Tab, money colors + Paper Dark, then Split a bill). 117 in 74.7 s before Split a bill; 116 in 77.8 s right after Tab; 107 in 78.0 s on 2026-10-17 (latest); 106 in 69.7 s before the No month test; 98 in 63.6 s before `planner-order.test.mjs`; 83 in 44.6–55.1 s before `moving.test.mjs` |
+| Tests in repo | **130 pass, 0 fail**, 13 suites, 87.6 s | `npm test`, 2026-10-29 (then diagrams). 121 before diagrams, after Split a bill; 117 in 74.7 s before Split a bill; 116 in 77.8 s right after Tab; 107 in 78.0 s on 2026-10-17 (latest); 106 in 69.7 s before the No month test; 98 in 63.6 s before `planner-order.test.mjs`; 83 in 44.6–55.1 s before `moving.test.mjs` |
 | Regression guards seen failing without their fix | 36 / 36 | mutation scripts: swap the fix back out, run the test file, check the named test failed, restore the file |
 | Features verified / total | **104 Done / 137** (33 Written, 0 Building) | Rows in the §3.4 feature tables (not "Deferred") |
 | Server start → first API response (fresh data dir, includes seeding) | 888 ms | 2026-10-15 session 2, bash loop polling `curl` every 50 ms |

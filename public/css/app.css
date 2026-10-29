@@ -463,6 +463,58 @@ svg { display: block; flex: none; }
 
 ::highlight(search-hit) { background-color: var(--mark); color: inherit; }
 
+/* ================= Diagrams: container ports, styles, lines, selection, guides ================= */
+/* Link dots: small, neutral, just outside the edge (never over the text). Hidden while you type in
+   the box; pointing at one still shows it. The ::before gives a bigger target than the dot. */
+.nb-port {
+  position: absolute; z-index: 4; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+  background: var(--canvas); border: 1.5px solid color-mix(in srgb, var(--text) 45%, var(--canvas));
+  opacity: 0; cursor: crosshair; transition: opacity .12s, transform .12s, background-color .12s, border-color .12s;
+}
+.nb-port::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
+.nb-port[data-side="top"] { left: 50%; top: -20px; } /* above the move bar */
+.nb-port[data-side="right"] { left: calc(100% + 8px); top: 50%; }
+.nb-port[data-side="bottom"] { left: 50%; top: calc(100% + 8px); }
+.nb-port[data-side="left"] { left: -8px; top: 50%; }
+.nb:hover:not(:focus-within) > .nb-port, .nb.selected > .nb-port, .nb > .nb-port:hover,
+.page-inner.linking .nb.link-target > .nb-port { opacity: 1; }
+.nb-port:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.4); }
+.page-inner.draw .nb-port, .page-inner.linking .nb:not(.link-target) > .nb-port { display: none; }
+.page-inner.linking .nb.link-target::before { border-color: var(--accent); border-width: 2px; }
+/* A border once linked (unless "never"), or always; a fill; rounded / pill shapes. */
+.nb.linked:not([data-border="never"])::before, .nb[data-border="always"]::before, .nb[data-fill]:not([data-border="never"])::before {
+  border-color: var(--nb-bc, color-mix(in srgb, var(--text) 38%, var(--canvas)));
+}
+.nb[data-fill] { background: var(--nb-fill); }
+.nb[data-shape="rounded"], .nb[data-shape="rounded"]::before { border-radius: 10px; }
+.nb[data-shape="pill"], .nb[data-shape="pill"]::before { border-radius: 999px; }
+.nb[data-shape="pill"] > .nb-content { padding: 4px 18px; }
+.nb.selected::before { border-color: var(--accent); }
+
+.link-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
+.link { --lc: color-mix(in srgb, var(--text) 55%, var(--canvas)); outline: 0; cursor: pointer; }
+.link-hit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; }
+.link-line { fill: none; stroke: var(--lc); stroke-width: 1.8px; stroke-linecap: round; }
+.link.dashed .link-line { stroke-dasharray: 6 5; }
+.link-arrow { fill: var(--lc); stroke: var(--lc); stroke-width: 1px; stroke-linejoin: round; }
+.link:hover .link-line { stroke-width: 2.6px; }
+.link.selected { --lc: var(--accent); }
+.link.selected .link-line { stroke-width: 2.6px; }
+.link-temp { fill: none; stroke: var(--accent); stroke-width: 2px; stroke-dasharray: 5 4; }
+.link-labels { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2; pointer-events: none; }
+.link-label {
+  --lc: color-mix(in srgb, var(--text) 55%, var(--canvas));
+  position: absolute; transform: translate(-50%, -50%); max-width: 180px; padding: 1px 8px; border-radius: 999px;
+  background: var(--canvas); border: 1px solid var(--lc); color: var(--text); font: 12px/1.5 var(--font-ui);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; cursor: pointer;
+}
+.link-label.selected { border-color: var(--accent); }
+.marquee { position: absolute; z-index: 6; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; }
+.align-guide { position: absolute; z-index: 6; pointer-events: none; background: var(--accent); opacity: .8; }
+.align-guide.v { top: 0; width: 1px; height: 100%; }
+.align-guide.h { left: 0; height: 1px; width: 100%; }
+.page-inner.todo-mode .link-layer, .page-inner.board-mode .link-layer, .page-inner.todo-mode .link-labels, .page-inner.board-mode .link-labels { display: none; }
+
 /* ink */
 .ink-layer {
   position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible;

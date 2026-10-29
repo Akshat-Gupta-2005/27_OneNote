@@ -93,9 +93,12 @@ The server stores this opaquely. It is a contract between clients.
 | `blocks[].x/y` | Container position in CSS px at 100% zoom, from the page's top-left. |
 | `blocks[].w` | Fixed width in px, or `null` = auto width (max 640 px). |
 | `blocks[].html` | Container HTML. Tags are `data-tag="todo\|important\|question\|critical\|idea\|contact"` on a paragraph element; a To Do also has `data-checked="true\|false"`. |
+| `blocks[].style` | *(Added 2026-10-29.)* Optional `{border?, shape?, color?, fill?}`: `border` `always`·`never` (absent = auto: shown once linked), `shape` `rounded`·`pill` (absent = rectangle), `color`/`fill` one of the 9 section colors. Unknown values are dropped. |
 | `ink[].t` | `pen` or `hl` (highlighter, drawn at 42% opacity). |
 | `ink[].c` | `#rrggbb`, or `auto` = the theme's ink color (white in dark, near-black in light). |
 | `ink[].p` | Flat `[x0, y0, x1, y1, …]`, rounded to 0.1 px. |
+
+| `links[]` | *(Added 2026-10-29; omitted when empty.)* `{id, from, to, ends, dash, shape, color, label}`: `from`/`to` are block ids; `ends` `end`·`both`·`none`; `shape` `curve`·`elbow`·`straight`; `color` one of the 9 section colors or `null` (theme default); `label` ≤ 80 chars, included in `text`. Links to missing blocks, or from a block to itself, are dropped on load. Sides and paths are not stored: they are recomputed from the boxes. |
 
 An empty string `""` is a valid `content` and means a blank page. Content that is not valid JSON is
 loaded by the frontend as a single container holding that string as HTML.

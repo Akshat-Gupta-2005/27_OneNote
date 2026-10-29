@@ -205,7 +205,8 @@ describe('keyboard shortcuts', () => {
     await page.waitForFunction(() => ![...document.querySelectorAll('#pageList .page-name')].some((e) => e.textContent === 'Delete me'));
     assert.ok((await api(server.url, 'GET', '/trash')).json.some((p) => p.title === 'Delete me'));
     assert.ok(await page.evaluate(() => document.activeElement.classList.contains('page-item')), 'focus stays in the list');
-    await page.click('.toast-action:has-text("Undo")');
+    // The page's own toast: the container deleted in the previous test has an Undo toast too.
+    await page.click('.toast:has-text("Delete me") .toast-action');
     await page.waitForFunction(() => [...document.querySelectorAll('#pageList .page-name')].some((e) => e.textContent === 'Delete me'));
   });
 
