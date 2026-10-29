@@ -126,7 +126,7 @@ value) means the canvas format above. `v` stays `1`.
 |---|---|
 | `months[].key` | `YYYY-MM`. Order in the array does not matter; clients sort by key. |
 | `months[].sub` | Text shown instead of the date range (e.g. "Joining month"). `""` = show `1–31 Oct`. |
-| `tasks[].month` | `YYYY-MM` or `null` (Unscheduled). |
+| `tasks[].month` | `YYYY-MM` or `null` (shown as "No month"; called Unscheduled before 2026-10-17). |
 | `tasks[].date` | `YYYY-MM-DD` or `null`. **If set, it must lie inside `month`.** The frontend enforces it on load (date wins). |
 | `tasks[].tag` | Free text ≤ 40 chars, or `null`. Tags exist only as values on tasks; there is no tag list. |
 | `tasks[].doneAt`, `created` | ms epoch, informational. |
@@ -155,6 +155,29 @@ Captured 2026-10-17 from a board built through the UI (trimmed to 2 of the 8 lab
 
 The frontend's `normalizeBoard()` fills defaults, gives missing ids, and turns an empty card title
 into "Untitled card".
+
+### Page `content`: tab (money with people) *(Added 2026-10-29.)*
+
+`"type": "tab"`, `v` stays `1`. Same obligation 10: a client that doesn't know it must not save
+over it. No currency is stored or shown; amounts are plain numbers.
+
+Example (one person, one combined item that was paid, one open item):
+
+```json
+{"v":1,"type":"tab","people":[{"id":"a","name":"Adarsh","payments":[{"id":"pay1","at":1793000000000}],"items":[{"id":"c","name":"Maggi and masala","qty":1,"price":106,"per":"total","payer":"me","created":1793000000000,"settled":"pay1","parts":[{"id":"1","name":"special maggi","qty":1,"price":40,"per":"total","payer":"me","created":1792900000000,"settled":null,"parts":null},{"id":"5","name":"shuttle","qty":1,"price":20,"per":"total","payer":"him","created":1792900000000,"settled":null,"parts":null}]},{"id":"8","name":"masala","qty":3,"price":5,"per":"unit","payer":"me","created":1793000000000,"settled":null,"parts":null}]}]}
+```
+
+| Field | Values |
+|---|---|
+| `items[].price` + `per` | The number that was typed, ≥ 0. `per: "total"` → it is the item's total and each = total ÷ qty; `per: "unit"` → it is the price of one and total = price × qty. Storing what was typed avoids rounding drift (100 for 3 stays 100, shown as 33.33 each). |
+| `items[].qty` | > 0, decimals allowed. Missing or ≤ 0 loads as 1. |
+| `items[].payer` | `me` (they owe you) or `him` (you owe them). The UI shows the person's name, not "him". |
+| `items[].settled` | The id of the payment that covers it, or `null` while open. Pointing at a missing payment loads as `null`. |
+| `items[].parts` | For a combined item, the original items (their `settled` is always `null`); otherwise `null`. The combined item's own `price` is the agreed amount, which may differ from the parts' sum. |
+| `payments[]` | `{id, at}` only. A payment's amount is the signed sum of the items that point at it, never stored. A payment no item points at is dropped on load. |
+| order | Array order is display order for `people` and for open items. |
+
+Balance for a person = Σ over open items of (+total if `payer` is `me`, −total if `him`).
 
 Clients must tolerate missing fields (the frontend's `normalizeTodo()` fills defaults and drops
 tasks with empty text). A client that does not understand `type: "todo"` **must not save over

@@ -2,6 +2,7 @@ import { api } from './api.js';
 import { h, esc, toast, showMenu, fmtDate, fmtTime, fmtSize } from './ui.js';
 import { TodoView } from './todo.js';
 import { BoardView } from './board.js';
+import { TabView } from './tab.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const OWN_MIME = 'application/x-onenote-clone';
@@ -136,12 +137,12 @@ export class PageEditor extends EventTarget {
     this.extentFrame = 0;
     this.selFrame = 0;
 
-    // 'canvas' = freeform page. Structured pages ('todo' planner, 'board' of cards) are rendered by
-    // a view object instead of containers; every view has mount/unmount/serialize/plainText/
-    // focusFirst/exportHtml and top/body elements.
+    // 'canvas' = freeform page. Structured pages ('todo' planner, 'board' of cards, 'tab' of money)
+    // are rendered by a view object instead of containers; every view has mount/unmount/serialize/
+    // plainText/focusFirst/exportHtml and top/body elements.
     this.kind = 'canvas';
     const onChange = () => this.scheduleSave();
-    this.views = { todo: new TodoView({ onChange }), board: new BoardView({ onChange }) };
+    this.views = { todo: new TodoView({ onChange }), board: new BoardView({ onChange }), tab: new TabView({ onChange }) };
     this.view = null;
 
     this.bind();
@@ -300,7 +301,8 @@ export class PageEditor extends EventTarget {
     }
     this.kind = this.views[data?.type] ? data.type : 'canvas';
     this.inner.classList.toggle('todo-mode', this.kind === 'todo');
-    this.inner.classList.toggle('board-mode', this.kind === 'board');
+    this.inner.classList.toggle('board-mode', this.kind === 'board' || this.kind === 'tab');
+    this.inner.classList.toggle('tab-mode', this.kind === 'tab');
     if (this.structured) {
       this.view = this.views[this.kind];
       this.lines = 'none';
@@ -349,7 +351,7 @@ export class PageEditor extends EventTarget {
     for (const v of Object.values(this.views)) v.unmount();
     this.view = null;
     this.kind = 'canvas';
-    this.inner.classList.remove('todo-mode', 'board-mode');
+    this.inner.classList.remove('todo-mode', 'board-mode', 'tab-mode');
   }
 
   /** Set the page title as if typed (used when inserting a template into an untitled page). */

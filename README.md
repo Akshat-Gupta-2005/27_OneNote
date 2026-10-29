@@ -6,11 +6,13 @@ A self-hosted, OneNote-style notes web app. Notebooks → color-coded sections �
 
 Requires **Node.js 22.13+** (uses the built-in `node:sqlite`, so there are no native modules to compile).
 
+On Windows, double-click **`start.bat`**. It installs dependencies on first run, picks the next free port if 3000 is taken (VS Code Live Preview often holds it), opens the app in your browser once it answers, and if the app is already running just opens it. Close the window to stop the server.
+
 ```bash
 npm install
 npm start          # http://127.0.0.1:3000
 npm run dev        # same, restarts on server file changes
-npm test           # 83 browser + API tests against throwaway servers (uses your installed Chrome or Edge)
+npm test           # 117 browser + API tests against throwaway servers (uses your installed Chrome or Edge)
 npm run backup     # consistent snapshot of the database into backups/
 ```
 
@@ -27,7 +29,7 @@ Environment variables:
 ## Features
 
 - **Notebooks / sections / pages**: create, rename, recolor, reorder by drag and drop, and move pages between sections and notebooks. Pages can be made subpages.
-- **Page templates** ("+ Add page ▾"): a **To-do planner** (checklist page with a progress bar, grouped by **month, due date or tag**, quick entry like `Sign offer letter #Sabre @20 Oct`, inline editing, undoable removal, "hide completed", drag tasks by their grip or move them with Alt+arrows) and **Cards** (a board of lists and cards with colored labels, covers, checklists, due dates, quick entry like `Fix login #Backend @20 Oct`, drag and drop for cards and whole lists, and keyboard moves).
+- **Page templates** ("+ Add page ▾"): a **To-do planner** (checklist page with a progress bar, grouped by **month, due date or tag**, quick entry like `Sign offer letter #Sabre @20 Oct`, inline editing, undoable removal, "hide completed", drag tasks by their grip or move them with Alt+arrows, a small + beside each heading to add, ticked tasks drop to the bottom, tags listed A→Z) and **Cards** (a board of lists and cards with colored labels, covers, checklists, due dates, quick entry like `Fix login #Backend @20 Oct`, drag and drop for cards and whole lists, and keyboard moves), and **Tab** (money with people: one list per person, items as qty × each = total with who paid, quick entry like `15 3x masala` or `-20 shuttle`, a running "Adarsh owes you 469", combine items into one agreed amount, and mark some or all items paid so they fold away).
 - **Insert → Templates**: add Meeting notes, a Daily journal, a Project plan or a Weekly planner to the page you are on, below what is already there (Undo in the toast).
 - **Keyboard**: every shortcut is listed in Help → Keyboard shortcuts, including list navigation (↑/↓, Delete, F2, Enter), task, card and list moves (Alt+arrows), and nudging a selected container (arrows, Shift = 10 px).
 - **Freeform canvas**: click anywhere on a page to start a note container. Drag a container by its top bar, resize it from the top-right corner, and press `Delete` to remove a selected container.
@@ -39,7 +41,7 @@ Environment variables:
 - **Search** across all notebooks or the current one (`Ctrl+E`), with matches highlighted on the page.
 - **Recent notes**, plus **Deleted pages** with restore. Deleted pages are kept for 60 days.
 - **View**: rule lines and grids, zoom, full-page view, print, and export a page as HTML.
-- **Theme tab**: 14 color schemes (Classic Dark/Light, Midnight, Arctic, Forest, Nightshade, Espresso, Solar Dark/Light, Paper, Rose, Ocean, High Contrast Dark/Light) with hover preview and "match system"; **create your own theme** from 8 colors with a live preview and readability check, and share it as a theme code; **looks** (Classic, Modern, Compact, Cozy) plus density, corners, interface font, paper-sheet pages and section-tab style. Saved on the server, so your themes survive clearing the browser.
+- **Theme tab**: 15 color schemes (Classic Dark/Light, Midnight, Arctic, Forest, Nightshade, Espresso, Paper Dark, Solar Dark/Light, Paper, Rose, Ocean, High Contrast Dark/Light) with hover preview and "match system"; **create your own theme** from 8 colors with a live preview and readability check, and share it as a theme code; **looks** (Classic, Modern, Compact, Cozy) plus density, corners, interface font, paper-sheet pages and section-tab style. Saved on the server, so your themes survive clearing the browser.
 - **Backup**: export everything to JSON and import it again (from the `⋯` menu).
 - Back/forward navigation and shareable page links (`/#/page/<id>`).
 

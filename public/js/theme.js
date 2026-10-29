@@ -66,6 +66,7 @@ export const SCHEMES = [
   { id: 'forest', name: 'Forest', base: 'dark', seeds: S('#7fb069', '#1b2420', '#1f2b25', '#17201b', '#e2ead9', '#a8d08d', '#8fc1e3', '#7fb069') },
   { id: 'nightshade', name: 'Nightshade', base: 'dark', seeds: S('#bd93f9', '#282a36', '#21222c', '#1d1e26', '#f8f8f2', '#ff79c6', '#8be9fd', '#50fa7b') },
   { id: 'espresso', name: 'Espresso', base: 'dark', seeds: S('#e0a96d', '#24201c', '#2b2520', '#1f1b17', '#ece0d1', '#e8b77a', '#9fc5e8', '#a3c48f') },
+  { id: 'paper-dark', name: 'Paper Dark', base: 'dark', seeds: S('#cf8f5e', '#2a2520', '#312b25', '#221e1a', '#ebe0cd', '#dba574', '#8fb9db', '#93bb7a') },
   { id: 'solar-dark', name: 'Solar Dark', base: 'dark', seeds: S('#268bd2', '#002b36', '#073642', '#00222b', '#c5d1d1', '#b58900', '#2aa198', '#859900') },
   { id: 'hc-dark', name: 'High Contrast Dark', base: 'dark', seeds: S('#ffd400', '#000000', '#000000', '#000000', '#ffffff', '#00e5ff', '#82b1ff', '#00e676') },
   { id: 'solar-light', name: 'Solar Light', base: 'light', seeds: S('#268bd2', '#fdf6e3', '#eee8d5', '#e8e1cb', '#4a5a60', '#cb4b16', '#1f6fb0', '#6c7a00') },

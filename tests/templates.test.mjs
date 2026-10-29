@@ -25,10 +25,10 @@ describe('templates', () => {
   };
   const headings = (sel = '.nb-content') => page.$$eval(`${sel} h1, ${sel} h2, ${sel} h3`, (e) => e.map((x) => x.textContent));
 
-  it('Add page ▾ offers page templates only: Blank, To-do planner, Cards', async () => {
+  it('Add page ▾ offers page templates only: Blank, To-do planner, Cards, Tab', async () => {
     await page.click('#addPageMenu');
     const names = await page.$$eval('.menu .menu-item .mi-label', (e) => e.map((x) => x.textContent));
-    assert.deepEqual(names, ['Blank page', 'To-do planner', 'Cards']);
+    assert.deepEqual(names, ['Blank page', 'To-do planner', 'Cards', 'Tab']);
     await page.keyboard.press('Escape');
   });
 

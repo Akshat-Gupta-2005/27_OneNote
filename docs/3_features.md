@@ -3,7 +3,23 @@
 Living document. Updated at the end of every working session, as part of the work. Reasoning and
 history live in [4_decisions.md](4_decisions.md).
 
-**Last updated:** 2026-10-17 (latest). **Movable everything, consistent across page kinds:** planner
+**Last updated:** 2026-10-29. New page kind **Tab** (money with people): one list per person,
+items as `qty × each = total` with who paid, a running "X owes you N" per person, combine
+selected items into one agreed amount, mark some or all items paid (they fold away). `npm test`:
+**117 tests pass**, 74.7 s (116 before the money colors, Paper Dark and one-line items). The 10 new Tab tests were not mutation-checked, so the guard count
+stays 36 of 36 from before.
+
+**Before that, 2026-10-17 (latest):** **"No month" group** always shown last in Month view (was
+"Unscheduled", shown only when non-empty), with its own +; `start.bat` launcher added. `npm test`:
+**107 tests pass**, 78.0 s; 36 of 36 guards proven by removal; 104 of 137 features verified.
+
+**Before that, same day:** **planner tidy-up:** each group's add box and Add button are
+replaced by a small **+** beside the heading (one box at a time; Enter adds, Esc closes); **checked
+tasks sink** to the bottom of their group, each half keeping its order; **Tag view is A→Z**.
+`npm test`: **106 tests pass**, 69.7 s; 35 of 35 guards proven by removal; 103 of 136 features
+verified.
+
+**Before that, same day:** **movable everything, consistent across page kinds:** planner
 tasks drag by a grip (reorder, or drop into another month/date/tag group) and move with Alt+arrows;
 Cards lists drag by their header and move with Alt+←/→; a selected freeform container nudges with
 the arrow keys; Cards quick-add now understands `#label @date` like the planner. `npm test`: **98
@@ -57,33 +73,37 @@ added, P5–P8 found and fixed. 0 tests in the repo at that point.
       js/editor.js   1359     PageEditor: load/serialize/autosave, structured views (todo | board), containers + arrow nudge, insertBlocks(),
                               formatting, tags, tables, uploads, paste sanitising, copy, drop, ink + eraser,
                               search highlight, format painter, dictation, HTML export
-      js/todo.js      780     To-do planner: data model + normalize, quick-add parser, Month/Date/Tag grouping,
-                              drag/keyboard task moves (applyGroup), rendering, task/month menus, date popover, view prefs, export
-      js/templates.js 108     PAGE_TEMPLATES (Blank, To-do planner, Cards) + INSERT_TEMPLATES (4 note templates)
+      js/todo.js      835     To-do planner: data model + normalize, quick-add parser, Month/Date/Tag grouping,
+                              drag/keyboard task moves (applyGroup), + add boxes, checked-last order, rendering, task/month menus, date popover, view prefs, export
+      js/templates.js 116     PAGE_TEMPLATES (Blank, To-do planner, Cards, Tab) + INSERT_TEMPLATES (4 note templates)
       js/board.js     663     Cards board: data model + normalize, lists, cards, card dialog, card + list drag & drop,
                               keyboard, #label @date quick-add (uses parseQuickAdd from todo.js)
-      js/theme.js     541     appearance: color math, 14 schemes, token derivation, looks, gallery, theme editor,
+      js/tab.js       717     Tab (money with people): data model + normalize, quick-entry parser, balances, item dialog
+                              (qty/each/total), select → combine / mark paid, payment folds, drag + keyboard moves; Cards styles
+      js/theme.js     541     appearance: color math, 15 schemes, token derivation, looks, gallery, theme editor,
                               server persistence + first-paint cache
       js/ui.js        251     h() builder, menus/submenus/popovers, modal/prompt/confirm, toasts, date/size formatters
       js/icons.js     105     inline SVG icon set, hydrateIcons(), setIcon()
       js/api.js        32     fetch wrapper (JSON + errors), upload()
     scripts/
       backup.mjs       32     VACUUM INTO snapshot + page-count check (npm run backup)
-      build-architecture.mjs 224  generates docs/8_architecture.html from docs/7_uml/*.md (npm run docs:arch)
+      build-architecture.mjs 226  generates docs/8_architecture.html from docs/7_uml/*.md (npm run docs:arch)
     tests/
       helpers.mjs     118     throwaway server (free port, temp DATA_DIR), installed Chrome/Edge, page helpers
       api.test.mjs    121     contract: shapes, errors, silent-failure obligations, export/import, P5
       editor.test.mjs 168     persistence, P1–P4, P6, P7, P9, no-op save guard
-      todo.test.mjs   216     planner: parser, views, progress, edit, undo, persistence, search, refusals
+      todo.test.mjs   228     planner: parser, views, progress, edit, undo, persistence, search, refusals
       templates.test.mjs 93   page vs insert templates, placement below notes, title rules, undo, refusal on boards
       board.test.mjs  188     Cards: lists, card dialog, badges, drag & drop, keyboard moves, persistence, search
-      shortcuts.test.mjs 272  every shortcut in Help (36), incl. list Delete/F2 (P13), container nudge
-      moving.test.mjs 181     drag + Alt-arrow moves: planner tasks across views, Cards lists, Cards #label @date
+      tab.test.mjs    188     Tab: parser, balances, qty/each/total dialog, combine/uncombine, partial + full payment, keyboard, persistence
+      shortcuts.test.mjs 273  every shortcut in Help (36), incl. list Delete/F2 (P13), container nudge
+      moving.test.mjs 189     drag + Alt-arrow moves: planner tasks across views, Cards lists, Cards #label @date
+      planner-order.test.mjs 126  + add boxes (open/close/blur), checked tasks last, tags A→Z
       theme.test.mjs  205     Theme tab: schemes, preview, looks, editor, persistence, first paint, import, system mode
     docs/                     this documentation set; 8_architecture.html is generated, never hand-edited
 
-Line counts: `wc -l`, 2026-10-17 (latest). App + backup script: 7,229; docs generator: 224; tests: 1,562;
-total 9,015.
+Line counts: `wc -l`, 2026-10-17 (latest). App + backup script: 7,284; docs generator: 226; tests: 1,709;
+total 9,219. Plus `start.bat` (Windows launcher).
 
 **Not yet built:** section groups, OneNote file import, multi-device sync/conflict detection,
 authentication, scheduled backups, cleanup of orphaned uploads, Markdown export, collapsing
@@ -157,9 +177,11 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 | Inserted notes searchable | Done 2026-10-17 | `Agenda` finds the page after the autosave (T) | editor autosave | |
 | Refused on planner and board pages | Done 2026-10-17 | Toast "freeform pages only", nothing added (T) | `insertTemplate()` | |
 | To-do planner page type | Done 2026-10-15 | Eyebrow, big title, description, `x of y done` + %, progress bar; no containers or ink on the page (T) | `todo.js`, `kind` in `editor.js` | |
-| Month view | Done 2026-10-15 | Month groups with range or custom subtitle, NOW badge, done/total, editable note, add box per month (T) | `groups()` in `todo.js` | |
-| Date view | Done 2026-10-15 | Overdue first (LATE), one group per date with TODAY badge and "in n days", No date last; add box per date (T) | `groups()` | |
-| Tag view | Done 2026-10-15 | One group per tag in first-use order + No tag; adding in a group applies its tag (T) | `groups()` | |
+| Month view | Done 2026-10-15 | Month groups with range or custom subtitle, NOW badge, done/total, editable note, + per month (T) | `groups()` in `todo.js` | |
+| Date view | Done 2026-10-15 | Overdue first (LATE), one group per date with TODAY badge and "in n days", No date last; + per date (T) | `groups()` | |
+| Tag view | Done 2026-10-15 | One group per tag, A→Z ignoring case (since 2026-10-17; was first-use order), No tag last; adding in a group applies its tag (T) | `groups()`, `allTags()` | |
+| + beside each heading opens the add box | Done 2026-10-17 | No boxes or Add buttons until a + is clicked; one open at a time; Enter adds and stays open; Esc closes and focuses the +; clicking away closes only an empty box, and the click still lands (T) | `openComposer()`, `composer()` | |
+| Checked tasks sink to the bottom | Done 2026-10-17 | Checked → bottom of its group; both halves keep their order; unchecking restores the old place; moves stay within a half; focus follows the ticked task (T) | `groupEl()`, `dropTarget()`, `moveByKey()` | ★ |
 | Quick-add `#tag @date` | Done 2026-10-15 | 10 parser cases incl. `@20 Oct`, `@3/11`, `@sat`, next-year roll, invalid `@31/2` kept as text (T). Add boxes hint `· #tag @date` since 2026-10-17 (T) | `parseQuickAdd()` | ★ |
 | Drag tasks to reorder or re-file | Done 2026-10-17 | Grip on hover. Within a group: reorder. Into another group: takes its month (a date outside it is cleared), date, tag, or "none". Overdue refuses drops. Survives reload (T) | `dropTarget()`, `applyGroup()`, `moveTask()` | ★ |
 | Move tasks with the keyboard | Done 2026-10-17 | Alt+↑/↓ within the group; Alt+←/→ to the previous/next group (skips Overdue); focus follows the task (T) | `moveByKey()` | |
@@ -170,7 +192,8 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 | Remove with Undo | Done 2026-10-15 | Undo restores the task at its old position (T) | `remove()` | |
 | Due-date popover | Done 2026-10-15 | "Tomorrow" quick pick sets the date chip (T). Typing a date in the picker not exercised | `datePopover()` | |
 | Tag menu, task ⋯ menu (move to month, mark done), month subtitle dialog | Written | Not exercised | `tagMenu`, `taskMenu`, `monthMenu` | |
-| Add month / remove month → Unscheduled | Done 2026-10-15 | New month group appears; removing a month with n tasks puts n under Unscheduled (T) | `addMonth()`, `monthMenu()` | |
+| Add month / remove month → No month | Done 2026-10-15 | New month group appears; removing a month with n tasks puts n under No month (T) | `addMonth()`, `monthMenu()` | |
+| "No month" group | Done 2026-10-17 | Always shown last in Month view, below "Add month", even when empty; its + adds a task with no month; drop target clears month and date (T) | `groups()` | |
 | View remembered per page; switching views never saves | Done 2026-10-15 | Tag view restored after reload; 3 switches → 0 PATCH (T) | `prefs` in `localStorage` `oc.todo.<id>` | ★ |
 | Header, notes and tasks persist | Done 2026-10-15 | Eyebrow, description, month note, done state survive reload (T) | `serialize()` | |
 | Planner text searchable | Done 2026-10-15 | `verification forms` finds the planner (T); `PyTest` finds Road to Sabre on the owner's server | `todoPlainText()` | |
@@ -239,6 +262,24 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 | Persistence + search | Done 2026-10-17 | Survives reload; checklist items searchable (T) | `serialize()`, `boardPlainText()` | |
 | Delete a non-empty list asks first, board HTML export | Written | Not exercised | `deleteColumn()`, `exportHtml()` | |
 
+### Tab (money with people)
+
+| Feature | Status | What it does | Lives in | Star |
+|---|---|---|---|---|
+| Tab page template | Done 2026-10-29 | Empty page; "+ Add person" opens straight into that person's add box (T) | `emptyTab()` in `tab.js` | |
+| Quick entry | Done 2026-10-29 | `40 special maggi`, `15 3xmasala` (total for 3), `3x5 masala` (3 at 5), `249 + 19 biryani` (sums), `maggi 30`, `-20 shuttle` (they paid); no price or no name is refused with a toast (T) | `parseTabEntry()` | ★ |
+| Balance per person | Done 2026-10-29 | "Adarsh owes you 469" / "You owe Adarsh 20" / "All square", with "You paid · Adarsh paid" of open items, always shown (0 · 0 when empty) so the first item does not push the list down (guard seen failing without it); page total "Owed to you · You owe" (T) | `personEl()`, `render()` | |
+| Money colors | Done 2026-10-29 | Green = they owe you, red = you owe them: item amounts, the balance line and the page total; darker shades on light themes; all ≥ 4.5:1 on their cards (T for colors; contrast measured in Paper and Paper Dark) | `.money-in` / `.money-out` in `app.css` | |
+| One-line items | Done 2026-10-29 | Every item is the same height (37 px): long names end in "…" (full name on hover), and qty, "N items" and "Adarsh paid" always sit just left of the amount (T) | `itemEl()` | |
+| Item dialog | Done 2026-10-29 | Name, Qty, Each, Total kept in step (the one typed is kept, the other worked out; 100 for 3 shows 33.33), Paid by Me / name, Delete (T) | `openItem()` | |
+| Combine | Done 2026-10-29 | Select items → Combine → name + agreed total (starts at their sum) → one item tagged "5 items"; the dialog lists the parts and their old sum; Uncombine puts them back (T) | `combine()`, `uncombine()` | ★ |
+| Partial and full payment | Done 2026-10-29 | Select items → Mark paid, or ⋯ → Settle up for all; paid items fold under "Paid 29 Oct · 374 · 2 items", which opens and has Undo payment (T) | `markPaid()`, `undoPayment()`, `paymentEl()` | |
+| Move and delete | Done 2026-10-29 | Drag items within or between people; Alt+arrows the same; Delete removes with Undo (T for keyboard and Delete; drag seen in code only) | `onKeyDown()`, `moveItem()`, drag handlers | |
+| People | Written | Rename (click name), move left/right, delete (asks if it has items) | `personMenu()`, `renamePerson()` | |
+| Persistence + search | Done 2026-10-29 | Survives reload; item names searchable, including paid and combined ones (T) | `serialize()`, `tabPlainText()` | |
+| HTML export | Written | Not exercised | `exportHtml()` | |
+| Paid an amount not tied to items ("here's 200") | Deferred | Owner: "think for later". Would make balance and open items stop adding up | | |
+
 ### Keyboard
 
 | Feature | Status | What it does | Lives in | Star |
@@ -253,7 +294,7 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 | Feature | Status | What it does | Lives in | Star |
 |---|---|---|---|---|
 | Theme tab between View and Help | Done 2026-10-16 | Tab order Home·Insert·Draw·View·Theme·Help (T) | `index.html` | |
-| 14 color schemes | Done 2026-10-16 | Classic Dark/Light (hand-tuned CSS) + 12 derived (Midnight, Arctic, Forest, Nightshade, Espresso, Solar Dark/Light, Paper, Rose, Ocean, High Contrast Dark/Light); all pass their contrast checks (T) | `SCHEMES` in `theme.js` | |
+| 15 color schemes | Done 2026-10-16 | Classic Dark/Light (hand-tuned CSS) + 13 derived (Midnight, Arctic, Forest, Nightshade, Espresso, Paper Dark (added 2026-10-29), Solar Dark/Light, Paper, Rose, Ocean, High Contrast Dark/Light); all pass their contrast checks (T) | `SCHEMES` in `theme.js` | |
 | Scheme gallery with hover preview | Done 2026-10-16 | Hover shows the scheme on the whole app; leaving/Escape restores (T) | `openSchemeGallery()` | |
 | Quick swatches in the ribbon | Done 2026-10-16 | One click switches; active swatch marked (T) | `renderThemeTab()` in `app.js` | |
 | Match system (Classic Light / Dark) | Done 2026-10-16 | Follows `prefers-color-scheme` live (T) | `setFollowSystem()` | |
@@ -273,8 +314,8 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 
 | Feature | Status | What it does | Lives in | Star |
 |---|---|---|---|---|
-| `npm test` | Done 2026-10-17 | 98 tests in 9 suites, all pass, 63.6 s (was 83 in 44.6–55.1 s before `moving.test.mjs`); each suite gets its own server on a free port and a temp `DATA_DIR` | `tests/` | |
-| Regression tests proven by removing the fix | Done 2026-10-17 | 30 of 30 guards fail with their fix removed. Latest 8: planner drop, month drop clears a foreign date, planner Alt+arrows, date-view drop, list drop, list Alt+arrows, label reuse by name, container nudge. Earlier 22: 15 earlier (P1–P7, P9, no-op save, theme ×6) + 7 on 2026-10-17 (page and section focusability for P13, list focus restore, planner Delete, card dialog Enter, composer submit handler, insert placement). Found P10 earlier; this round showed two mutations that were not real removals (see decisions) | mutation scripts | ★★ |
+| `npm test` | Done 2026-10-17 | 107 tests in 10 suites, all pass, 78.0 s (83 in 44.6–55.1 s before `moving.test.mjs` and `planner-order.test.mjs`); each suite gets its own server on a free port and a temp `DATA_DIR` | `tests/` | |
+| Regression tests proven by removing the fix | Done 2026-10-17 | 36 of 36 guards fail with their fix removed (latest: No month shown when empty). Latest 5: checked tasks sink, tags A→Z, boxes closed until +, deferred close on blur, Alt-arrows stay within a half (this one first passed with its fix removed; the test was strengthened, see decisions). Before that 8: planner drop, month drop clears a foreign date, planner Alt+arrows, date-view drop, list drop, list Alt+arrows, label reuse by name, container nudge. Earlier 22: 15 earlier (P1–P7, P9, no-op save, theme ×6) + 7 on 2026-10-17 (page and section focusability for P13, list focus restore, planner Delete, card dialog Enter, composer submit handler, insert placement). Found P10 earlier; this round showed two mutations that were not real removals (see decisions) | mutation scripts | ★★ |
 
 ### Deferred and rejected
 
@@ -295,9 +336,9 @@ data) unless stated.
 
 | What | Result | How |
 |---|---|---|
-| Tests in repo | **98 pass, 0 fail**, 9 suites, 63.6 s | `npm test`, 2026-10-17 (latest). Before `moving.test.mjs`: 83 in 44.6–55.1 s over three runs |
-| Regression guards seen failing without their fix | 30 / 30 | mutation scripts: swap the fix back out, run the test file, check the named test failed, restore the file |
-| Features verified / total | **101 Done / 134** (33 Written, 0 Building) | Rows in the §3.4 feature tables (not "Deferred") |
+| Tests in repo | **117 pass, 0 fail**, 12 suites, 74.7 s | `npm test`, 2026-10-29 (Tab, then money colors + Paper Dark). 116 in 77.8 s right after Tab; 107 in 78.0 s on 2026-10-17 (latest); 106 in 69.7 s before the No month test; 98 in 63.6 s before `planner-order.test.mjs`; 83 in 44.6–55.1 s before `moving.test.mjs` |
+| Regression guards seen failing without their fix | 36 / 36 | mutation scripts: swap the fix back out, run the test file, check the named test failed, restore the file |
+| Features verified / total | **104 Done / 137** (33 Written, 0 Building) | Rows in the §3.4 feature tables (not "Deferred") |
 | Server start → first API response (fresh data dir, includes seeding) | 888 ms | 2026-10-15 session 2, bash loop polling `curl` every 50 ms |
 | Search, 2,001 pages × ~2 KB text | 24 ms (1 term), 24 ms (2 terms), 26 ms (no match) | 2026-10-15 session 2, median of 5 warm `curl -w %{time_total}` |
 | Search, 20,001 pages × ~2 KB text | 201 / 214 / 228 ms | same |
@@ -305,7 +346,7 @@ data) unless stated.
 | Owner's live DB | `notes.db` 4,096 B, `notes.db-wal` 201,912 B | `stat` on 2026-10-15 while the server ran (P8) |
 | Backup of owner's data before adding Road to Sabre | 49,152 B, 2 pages | `npm run backup`, 2026-10-15 session 3 |
 | Dependencies | 1 runtime (express) + 1 dev (playwright-core); 66 packages, 17 MB in `node_modules`, 14 MB of it playwright-core | `ls node_modules \| wc -l`, `du -sh` |
-| Source size | 7,229 lines app + backup; 224 docs generator; 1,562 tests | `wc -l`, 2026-10-17 |
+| Source size | 7,284 lines app + backup; 226 docs generator; 1,709 tests | `wc -l`, 2026-10-17 |
 
 ## 3.6 Talking points
 
@@ -412,6 +453,17 @@ the pointer, makes a 2 px pen line almost impossible to hit. With points, erasin
 distance-to-segment test with a radius of `6 px / zoom + stroke width / 2`, so thin lines erase as
 easily as thick ones and the hit radius stays constant on screen at any zoom (`hitStroke()`).
 
+### ★ "Retain their order" for free: sort in the view, not the data
+
+The owner wanted ticked tasks to drop to the bottom, but with both halves keeping their order. The
+tempting implementation moves a task to the end of the array when it is ticked. Then unticking it
+has to remember where it came from, and a ticked task's "own order" becomes the order of ticking.
+Instead the array never changes: the view shows `[...unchecked, ...checked]`, each filtered in array
+order. Unticking is just a re-render, and the task is back in its old place. The one catch: moves
+have to stay within a half. Alt+↑ on a ticked task "above" an unticked one changes the array but
+not the screen, and the bug only appears later when that task is unticked. The first version of the
+test missed it, because it only looked at the screen; the mutation check caught that.
+
 ### ★ Three page kinds, one way to move things
 
 A freeform page, a planner and a board store very different things (positioned HTML containers, a
@@ -432,7 +484,8 @@ move is one splice whatever the view.
 
 The owner plans in months ("December: find a flat") and only some tasks have real dates. So a task
 has a `month` and may also have a `date`, and a date always wins: typing `@20 Nov` into October's
-add box files the task under November and says so. One quick-add box understands `#tag` and
+add box files the task under November and says so. (Since 2026-10-17 each group's box opens from a
++ beside its heading.) One quick-add box understands `#tag` and
 `@today`, `@sat`, `@20 Oct` and `@3/11` (day/month). A date without a year picks the group's year,
 or the nearest year no more than 60 days back, so `@5 jan` typed in October means next January. An
 impossible date like `@31/2` stays in the task text, so the typo stays visible instead of
@@ -455,7 +508,7 @@ lines matters in a way it doesn't for a normal function call.
 
 ## 3.7 Open items
 
-- [ ] **Reload open browser tabs** to get task/list dragging, Alt-arrow moves, container nudge and Cards `#label @date` (and, from earlier, Insert → Templates, Cards and the keyboard fixes (frontend-only
+- [ ] **Reload open browser tabs** to get the + add boxes, checked-last order, A→Z tags, task/list dragging, Alt-arrow moves, container nudge and Cards `#label @date` (and, from earlier, Insert → Templates, Cards and the keyboard fixes (frontend-only
       change; no server restart needed).
 - [ ] **Owner: next customization** (W3). Templates were the first.
 - [ ] Verify the 33 `Written` features with tests (W2.5).

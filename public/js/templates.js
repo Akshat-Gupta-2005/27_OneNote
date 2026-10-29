@@ -5,6 +5,7 @@
 //    are added to the page you're on, below what is already there.
 import { emptyTodo, todoPlainText } from './todo.js';
 import { emptyBoard, boardPlainText } from './board.js';
+import { emptyTab, tabPlainText } from './tab.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
@@ -39,6 +40,13 @@ export const PAGE_TEMPLATES = [
     build: () => {
       const data = emptyBoard();
       return { title: 'Cards', content: JSON.stringify(data), text: boardPlainText(data) };
+    },
+  },
+  {
+    id: 'tab', name: 'Tab', icon: 'wallet', hint: 'Money with people: who owes whom',
+    build: () => {
+      const data = emptyTab();
+      return { title: 'Tab', content: JSON.stringify(data), text: tabPlainText(data) };
     },
   },
 ];
