@@ -840,6 +840,24 @@ kbd {
 .tab-nums .field-label { display: flex; flex-direction: column; gap: 4px; }
 .tab-parts { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--hover); }
 .tab-note { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+.tab-view .board-toolbar .btn svg { width: 14px; height: 14px; }
+/* Split a bill */
+.split-dialog { max-width: 500px; }
+.split-top { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+.split-payer { display: flex; align-items: center; gap: 10px; }
+.split-payer .select { flex: 1; }
+.split-methods { flex-wrap: wrap; align-self: flex-start; }
+.split-rows { display: flex; flex-direction: column; gap: 4px; }
+.split-row { display: grid; grid-template-columns: 1fr 110px 72px; align-items: center; gap: 8px; min-height: 34px; }
+.split-row.off .split-who span { color: var(--text-faint); }
+.split-row .input.ghost { visibility: hidden; }
+.split-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.split-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-who input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+.split-share { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.split-dialog { --money-out: #ff8a80; }
+:root[data-theme="light"] .split-dialog { --money-out: #c0362c; }
+.split-status.bad { color: var(--money-out); }
 
 /* ================= Looks (data-* on <html>, set by theme.js) ================= */
 html[data-density="compact"] { --row-h: 30px; --rb-h: 28px; --head-h: 38px; --menu-h: 28px; }

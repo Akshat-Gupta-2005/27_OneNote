@@ -174,6 +174,7 @@ Example (one person, one combined item that was paid, one open item):
 | `items[].payer` | `me` (they owe you) or `him` (you owe them). The UI shows the person's name, not "him". |
 | `items[].settled` | The id of the payment that covers it, or `null` while open. Pointing at a missing payment loads as `null`. |
 | `items[].parts` | For a combined item, the original items (their `settled` is always `null`); otherwise `null`. The combined item's own `price` is the agreed amount, which may differ from the parts' sum. |
+| `items[].split` | *(Added 2026-10-29.)* On items made by "Split a bill": `{total, method, ways}` with `method` one of `equal exact percent shares fraction`; otherwise `null`. Display only: the item's own `price` is the share. Bad values load as `null`; an unknown method as `equal`. |
 | `payments[]` | `{id, at}` only. A payment's amount is the signed sum of the items that point at it, never stored. A payment no item points at is dropped on load. |
 | order | Array order is display order for `people` and for open items. |
 

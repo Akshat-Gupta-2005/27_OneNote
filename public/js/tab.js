@@ -78,6 +78,77 @@ export function parseTabEntry(raw) {
   return { name, qty, price, per, payer };
 }
 
+// ---------- splitting a bill ----------
+export const SPLIT_METHODS = [['equal', 'Equal'], ['exact', 'Exact'], ['percent', 'Percent'], ['shares', 'Shares'], ['fraction', 'Fraction']];
+const methodName = (m) => SPLIT_METHODS.find(([id]) => id === m)?.[1].toLowerCase() || m;
+
+/** "1/3" → 0.333…, "0.5" → 0.5; anything else → null. */
+function parseFraction(s) {
+  const m = String(s ?? '').trim().match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (m) return Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : null;
+  return num(s);
+}
+
+/** Round each share to 2 decimals and give the leftover cents to the biggest, so they add up exactly. */
+function fixRounding(total, raw) {
+  const shares = raw.map(round2);
+  const diff = round2(total - shares.reduce((a, b) => a + b, 0));
+  if (diff && shares.length) {
+    const i = raw.indexOf(Math.max(...raw));
+    shares[i] = round2(shares[i] + diff);
+  }
+  return shares;
+}
+
+/**
+ * Each included person's share of `total`. `values` holds what was typed per person (ignored for
+ * equal): an amount (exact), a percent, a number of shares, or a fraction like "1/3".
+ * Returns { shares, status } when it adds up, otherwise { error }.
+ */
+export function splitShares(total, method, values) {
+  const n = values.length;
+  if (!(total > 0)) return { error: 'Enter the total.' };
+  if (!n) return { error: 'Tick who it is split between.' };
+  const sumOf = (v) => v.reduce((a, b) => a + b, 0);
+  if (method === 'equal') return { shares: fixRounding(total, values.map(() => total / n)), status: `${n} way${n === 1 ? '' : 's'} · ${fmt(total / n)} each` };
+  const parse = method === 'fraction' ? parseFraction : num;
+  const v = values.map(parse);
+  if (v.some((x) => x == null || x < 0)) {
+    return { error: { exact: 'Enter an amount for everyone ticked.', percent: 'Enter a percent for everyone ticked.', shares: 'Enter shares for everyone ticked.', fraction: 'Enter a fraction like 1/3 for everyone ticked.' }[method] };
+  }
+  const s = sumOf(v);
+  if (method === 'exact') {
+    const left = round2(total - s);
+    if (left) return { error: left > 0 ? `${fmt(left)} left to assign` : `${fmt(-left)} more than the total` };
+    return { shares: v.map(round2), status: `Adds up to ${fmt(total)}` };
+  }
+  if (method === 'percent') {
+    if (Math.abs(s - 100) >= 0.01) return { error: `Adds up to ${fmt(s)}%, needs 100%` };
+    return { shares: fixRounding(total, v.map((p) => (total * p) / 100)), status: 'Adds up to 100%' };
+  }
+  if (method === 'shares') {
+    if (!(s > 0)) return { error: 'Give someone at least 1 share.' };
+    return { shares: fixRounding(total, v.map((w) => (total * w) / s)), status: `${fmt(s)} share${s === 1 ? '' : 's'} · 1 share = ${fmt(total / s)}` };
+  }
+  if (method === 'fraction') {
+    if (Math.abs(s - 1) >= 0.001) return { error: `Adds up to ${fmt(s)}, needs 1` };
+    return { shares: fixRounding(total, v.map((f) => total * f)), status: 'Adds up to 1' };
+  }
+  return { error: 'Pick how to split it.' };
+}
+
+/**
+ * A tab only tracks what is between you and each person, so a split records:
+ *  - you paid: each other person's share, as an item they owe you;
+ *  - someone paid: only your share, as an item you owe them.
+ * `rows` is [{ id: 'me' | personId, share }].
+ */
+export function splitRecords(payer, rows) {
+  if (payer === 'me') return rows.filter((r) => r.id !== 'me' && r.share > 0).map((r) => ({ person: r.id, share: r.share, payer: 'me' }));
+  const mine = rows.find((r) => r.id === 'me');
+  return mine?.share > 0 ? [{ person: payer, share: mine.share, payer: 'him' }] : [];
+}
+
 /** A new, empty tab: people are added with "+ Add person". */
 export function emptyTab() {
   return { v: 1, type: 'tab', people: [] };
@@ -98,6 +169,14 @@ function normItem(raw, depth = 0) {
     created: Number(raw.created) || 0,
     settled: depth === 0 && typeof raw.settled === 'string' ? raw.settled : null,
     parts: parts.length ? parts : null,
+    // Set on items made by "Split a bill": the bill's total, how it was split, and how many ways.
+    split: raw.split && num(raw.split.total) > 0
+      ? {
+        total: round2(num(raw.split.total)),
+        method: SPLIT_METHODS.some(([m]) => m === raw.split.method) ? raw.split.method : 'equal',
+        ways: Math.max(1, Math.round(num(raw.split.ways) || 1)),
+      }
+      : null,
   };
 }
 
@@ -339,6 +418,144 @@ export class TabView {
     this.change();
   }
 
+  // ---------- split a bill ----------
+  async openSplit() {
+    const people = this.data.people;
+    if (!people.length) return toast('Add a person first, then split a bill with them.');
+    const pid = this.pageId;
+    let method = 'equal';
+    let edited = false; // once you type a per-person value, changing the total no longer refills them
+    const rows = [{ id: 'me', name: 'Me' }, ...people.map((p) => ({ id: p.id, name: p.name }))].map((r) => ({ ...r, on: true }));
+
+    const nameInput = h('input', { class: 'input', placeholder: 'What was it for?', 'aria-label': 'What was it for', maxlength: '200' });
+    const totalInput = h('input', { class: 'input', type: 'number', step: 'any', min: '0', inputmode: 'decimal', placeholder: 'Total', 'aria-label': 'Total' });
+    const payerSelect = h('select', { class: 'select', 'aria-label': 'Paid by' }, rows.map((r) => h('option', { value: r.id }, r.name)));
+    const seg = h('div', { class: 'seg split-methods', role: 'group', 'aria-label': 'How to split' });
+    const status = h('p', { class: 'tab-note split-status' });
+    const recorded = h('p', { class: 'tab-note split-recorded' });
+    let okBtn = null;
+
+    for (const r of rows) {
+      r.check = h('input', { type: 'checkbox', checked: true, 'aria-label': `Include ${r.name}` });
+      r.input = h('input', { class: 'input', 'aria-label': `${r.name}'s part`, autocomplete: 'off' });
+      r.share = h('span', { class: 'split-share' });
+      r.el = h('div', { class: 'split-row', 'data-split-row': r.id }, h('label', { class: 'split-who' }, r.check, h('span', {}, r.name)), r.input, r.share);
+      r.check.addEventListener('change', () => { r.on = r.check.checked; prefill(); update(); });
+      r.input.addEventListener('input', () => { edited = true; update(); });
+    }
+    const included = () => rows.filter((r) => r.on);
+
+    // Sensible starting values for each method, so most splits need only a tweak.
+    const prefill = () => {
+      edited = false;
+      const on = included();
+      const n = on.length;
+      const total = num(totalInput.value) || 0;
+      const even = (t) => (n ? fixRounding(t, on.map(() => t / n)).map(fmt) : []);
+      const values = {
+        exact: total ? even(total) : on.map(() => ''),
+        percent: even(100),
+        shares: on.map(() => '1'),
+        fraction: on.map(() => `1/${n}`),
+        equal: on.map(() => ''),
+      }[method];
+      on.forEach((r, i) => { r.input.value = values[i]; });
+      for (const r of rows) {
+        // Equal needs no per-person value: the box keeps its grid cell (so shares stay aligned) but is invisible.
+        r.input.disabled = !r.on || method === 'equal';
+        if (!r.on) r.input.value = '';
+        r.input.classList.toggle('ghost', method === 'equal');
+        r.input.placeholder = { exact: 'Amount', percent: '%', shares: 'Shares', fraction: 'e.g. 1/3' }[method] || '';
+      }
+    };
+
+    const compute = () => {
+      const on = included();
+      const res = splitShares(num(totalInput.value) ?? 0, method, on.map((r) => r.input.value));
+      const shareRows = res.shares ? on.map((r, i) => ({ id: r.id, share: res.shares[i] })) : [];
+      return { on, res, records: res.shares ? splitRecords(payerSelect.value, shareRows) : [], shareRows };
+    };
+
+    const update = () => {
+      const { on, res, records, shareRows } = compute();
+      for (const r of rows) {
+        const s = shareRows.find((x) => x.id === r.id);
+        r.share.textContent = s ? fmt(s.share) : '';
+        r.el.classList.toggle('off', !r.on);
+      }
+      status.textContent = res.error || res.status;
+      status.classList.toggle('bad', !!res.error);
+      const name = (id) => rows.find((r) => r.id === id).name;
+      let text = '';
+      if (res.shares) {
+        if (records.length) {
+          text = `Adds: ${records.map((x) => (x.payer === 'me' ? `${name(x.person)} owes you ${fmt(x.share)}` : `you owe ${name(x.person)} ${fmt(x.share)}`)).join(' · ')}`;
+          const others = payerSelect.value !== 'me' ? on.filter((r) => r.id !== 'me' && r.id !== payerSelect.value) : [];
+          if (others.length) text += `. ${others.map((r) => r.name).join(', ')}'s part stays between them and ${name(payerSelect.value)}.`;
+        } else {
+          text = payerSelect.value === 'me' ? 'Nothing to add: the whole bill is your share.' : 'Nothing to add: you are not part of this split.';
+        }
+      }
+      recorded.textContent = text;
+      if (okBtn) okBtn.disabled = !records.length;
+    };
+
+    const renderSeg = () => seg.replaceChildren(...SPLIT_METHODS.map(([id, label]) => h('button', {
+      type: 'button', class: method === id ? 'on' : '', 'aria-pressed': String(method === id), 'data-method': id,
+      onclick: () => { method = id; renderSeg(); prefill(); update(); },
+    }, label)));
+    totalInput.addEventListener('input', () => { if (!edited) prefill(); update(); });
+    payerSelect.addEventListener('change', update);
+    renderSeg();
+    prefill();
+    update();
+
+    const ok = await modal({
+      title: 'Split a bill',
+      className: 'tab-dialog split-dialog',
+      body: [
+        h('div', { class: 'split-top' }, nameInput, totalInput),
+        h('div', { class: 'split-payer' }, h('span', { class: 'field-label' }, 'Paid by'), payerSelect),
+        h('div', { class: 'field-label' }, 'Split'), seg,
+        h('div', { class: 'split-rows' }, rows.map((r) => r.el)),
+        status,
+        recorded,
+      ],
+      actions: [{ label: 'Cancel' }, { label: 'Split', primary: true, value: true }],
+      onOpen: (dlg) => {
+        okBtn = dlg.querySelector('.modal-actions .btn.primary');
+        update();
+        nameInput.focus();
+      },
+    });
+    if (!ok || this.pageId !== pid) return;
+    const { on, records } = compute();
+    if (!records.length) return;
+    const total = round2(num(totalInput.value));
+    const name = nameInput.value.trim().slice(0, 200) || 'Split bill';
+    const added = [];
+    for (const rec of records) {
+      const p = this.person(rec.person);
+      if (!p) continue;
+      const item = {
+        id: uid(), name, qty: 1, price: rec.share, per: 'total', payer: rec.payer, created: Date.now(),
+        settled: null, parts: null, split: { total, method, ways: on.length },
+      };
+      p.items.push(item);
+      added.push(item.id);
+    }
+    this.change();
+    toast(`Split ${fmt(total)} ${on.length} way${on.length === 1 ? '' : 's'}`, {
+      action: 'Undo',
+      timeout: 6000,
+      onAction: () => {
+        if (this.pageId !== pid || !this.data) return toast('That page is no longer open.');
+        for (const p of this.data.people) p.items = p.items.filter((i) => !added.includes(i.id));
+        this.change();
+      },
+    });
+  }
+
   signedText(p, s) {
     return s < 0 ? `${fmt(-s)} (${p.name} paid)` : fmt(s);
   }
@@ -357,7 +574,8 @@ export class TabView {
     }
     const toolbar = h('div', { class: 'board-toolbar' },
       h('span', { class: 'board-stats tab-summary' },
-        'Owed to you ', h('b', { class: 'money-in' }, fmt(owed)), ' · You owe ', h('b', { class: 'money-out' }, fmt(owe))));
+        'Owed to you ', h('b', { class: 'money-in' }, fmt(owed)), ' · You owe ', h('b', { class: 'money-out' }, fmt(owe))),
+      h('button', { class: 'btn small', 'data-act': 'split', title: 'Split one bill between you and others' }, h('span', { html: svg('split', 14) }), 'Split a bill'));
     const cols = h('div', { class: 'board-cols' }, d.people.map((p) => this.personEl(p)), this.addPersonEl());
     this.body.replaceChildren(toolbar, h('div', { class: 'board-area', style: `--board-bg:${BG}` }, cols));
 
@@ -419,6 +637,7 @@ export class TabView {
     h('span', { class: 'tab-name', title: i.name }, i.name),
     qty ? h('span', { class: 'tab-qty' }, qty) : null,
     i.parts ? h('span', { class: 'tab-tag' }, `${i.parts.length} items`) : null,
+    i.split ? h('span', { class: 'tab-tag', title: `Share of ${fmt(i.split.total)}, split ${i.split.ways} ways (${methodName(i.split.method)})` }, 'split') : null,
     i.payer === 'him' ? h('span', { class: 'tab-tag', title: `${p.name} paid` }, `${p.name} paid`) : null,
     h('span', { class: `tab-amt ${i.payer === 'him' ? 'money-out' : 'money-in'}` }, (i.payer === 'him' ? '−' : '') + fmt(total)));
   }
@@ -462,6 +681,7 @@ export class TabView {
     const p = colEl && this.person(colEl.dataset.person);
     if (act && this.body.contains(act)) {
       switch (act.dataset.act) {
+        case 'split': this.openSplit(); return;
         case 'open-composer': this.composer = p.id; this.refocus = { composer: p.id }; this.render(); return;
         case 'open-person-composer': this.composer = 'person'; this.refocus = { composer: 'person' }; this.render(); return;
         case 'close-composer': this.composer = null; this.render(); return;
@@ -688,6 +908,7 @@ export class TabView {
           h('label', { class: 'field-label' }, 'Each', each),
           h('label', { class: 'field-label' }, 'Total', total)),
         h('div', { class: 'field-label' }, 'Paid by'), seg,
+        item.split ? h('p', { class: 'tab-note' }, `${item.payer === 'me' ? `${p.name}'s` : 'Your'} share of ${fmt(item.split.total)}, split ${item.split.ways} ways (${methodName(item.split.method)}).`) : null,
         ...parts,
       ],
       actions: [

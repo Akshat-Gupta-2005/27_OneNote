@@ -273,6 +273,7 @@ subpages in the page list, drag-to-reorder tasks inside the planner, recurring t
 | One-line items | Done 2026-10-29 | Every item is the same height (37 px): long names end in "…" (full name on hover), and qty, "N items" and "Adarsh paid" always sit just left of the amount (T) | `itemEl()` | |
 | Item dialog | Done 2026-10-29 | Name, Qty, Each, Total kept in step (the one typed is kept, the other worked out; 100 for 3 shows 33.33), Paid by Me / name, Delete (T) | `openItem()` | |
 | Combine | Done 2026-10-29 | Select items → Combine → name + agreed total (starts at their sum) → one item tagged "5 items"; the dialog lists the parts and their old sum; Uncombine puts them back (T) | `combine()`, `uncombine()` | ★ |
+| Split a bill | Done 2026-10-29 | "Split a bill" (top right): name, total, paid by (you or anyone), who's in (ticks), and Equal / Exact / Percent / Shares / Fraction with a live share per person; leftover cents go to one person so shares add up exactly; Split stays disabled until they do. Records only you ↔ each person: you paid → each of them owes you their share; they paid → you owe them yours, others' parts stay between them (dialog says so). Items get a "split" tag; Undo in the toast (T) | `openSplit()`, `splitShares()`, `splitRecords()` | ★ |
 | Partial and full payment | Done 2026-10-29 | Select items → Mark paid, or ⋯ → Settle up for all; paid items fold under "Paid 29 Oct · 374 · 2 items", which opens and has Undo payment (T) | `markPaid()`, `undoPayment()`, `paymentEl()` | |
 | Move and delete | Done 2026-10-29 | Drag items within or between people; Alt+arrows the same; Delete removes with Undo (T for keyboard and Delete; drag seen in code only) | `onKeyDown()`, `moveItem()`, drag handlers | |
 | People | Written | Rename (click name), move left/right, delete (asks if it has items) | `personMenu()`, `renamePerson()` | |
@@ -336,7 +337,7 @@ data) unless stated.
 
 | What | Result | How |
 |---|---|---|
-| Tests in repo | **117 pass, 0 fail**, 12 suites, 74.7 s | `npm test`, 2026-10-29 (Tab, then money colors + Paper Dark). 116 in 77.8 s right after Tab; 107 in 78.0 s on 2026-10-17 (latest); 106 in 69.7 s before the No month test; 98 in 63.6 s before `planner-order.test.mjs`; 83 in 44.6–55.1 s before `moving.test.mjs` |
+| Tests in repo | **121 pass, 0 fail**, 12 suites | `npm test`, 2026-10-29 (Tab, money colors + Paper Dark, then Split a bill). 117 in 74.7 s before Split a bill; 116 in 77.8 s right after Tab; 107 in 78.0 s on 2026-10-17 (latest); 106 in 69.7 s before the No month test; 98 in 63.6 s before `planner-order.test.mjs`; 83 in 44.6–55.1 s before `moving.test.mjs` |
 | Regression guards seen failing without their fix | 36 / 36 | mutation scripts: swap the fix back out, run the test file, check the named test failed, restore the file |
 | Features verified / total | **104 Done / 137** (33 Written, 0 Building) | Rows in the §3.4 feature tables (not "Deferred") |
 | Server start → first API response (fresh data dir, includes seeding) | 888 ms | 2026-10-15 session 2, bash loop polling `curl` every 50 ms |

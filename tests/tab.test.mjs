@@ -200,11 +200,93 @@ describe('Tab', () => {
     assert.equal(await page.textContent('.tab-summary'), 'Owed to you 75 · You owe 0');
   });
 
+  it('split maths: every method adds up exactly, and only you ↔ them is recorded', async () => {
+    const r = await page.evaluate(async () => {
+      const { splitShares, splitRecords } = await import('/js/tab.js');
+      return {
+        equal: splitShares(100, 'equal', ['', '', '']).shares,
+        exact: splitShares(100, 'exact', ['70', '30']).shares,
+        exactShort: splitShares(100, 'exact', ['70', '20']).error,
+        percent: splitShares(1200, 'percent', ['50', '25', '25']).shares,
+        percentBad: splitShares(1200, 'percent', ['50', '40']).error,
+        shares: splitShares(90, 'shares', ['2', '1']).shares,
+        fraction: splitShares(90, 'fraction', ['1/3', '2/3']).shares,
+        fractionBad: splitShares(90, 'fraction', ['1/2', '1/3']).error,
+        noTotal: splitShares(0, 'equal', ['']).error,
+        iPaid: splitRecords('me', [{ id: 'me', share: 400 }, { id: 'a', share: 400 }, { id: 'r', share: 400 }]),
+        hePaid: splitRecords('a', [{ id: 'me', share: 60 }, { id: 'a', share: 30 }, { id: 'r', share: 10 }]),
+        hePaidNotMe: splitRecords('a', [{ id: 'a', share: 50 }, { id: 'r', share: 50 }]),
+      };
+    });
+    assert.deepEqual(r.equal, [33.34, 33.33, 33.33], 'leftover cents go to one person, total stays 100');
+    assert.deepEqual(r.exact, [70, 30]);
+    assert.equal(r.exactShort, '10 left to assign');
+    assert.deepEqual(r.percent, [600, 300, 300]);
+    assert.equal(r.percentBad, 'Adds up to 90%, needs 100%');
+    assert.deepEqual(r.shares, [60, 30]);
+    assert.deepEqual(r.fraction, [30, 60]);
+    assert.match(r.fractionBad, /needs 1/);
+    assert.equal(r.noTotal, 'Enter the total.');
+    assert.deepEqual(r.iPaid, [{ person: 'a', share: 400, payer: 'me' }, { person: 'r', share: 400, payer: 'me' }]);
+    assert.deepEqual(r.hePaid, [{ person: 'a', share: 60, payer: 'him' }], 'when Adarsh pays, only your share is recorded');
+    assert.deepEqual(r.hePaidNotMe, []);
+  });
+
+  it('Split a bill: equal three ways adds each person their share, with Undo', async () => {
+    const d = (sel) => page.locator(`.split-dialog ${sel}`);
+    await page.click('.tab-view [data-act="split"]');
+    await d('input[aria-label="What was it for"]').fill('dinner');
+    await d('input[aria-label="Total"]').fill('1200');
+    assert.deepEqual(await d('.split-share').allTextContents(), ['400', '400', '400']);
+    assert.equal(await d('.split-recorded').textContent(), 'Adds: Adarsh owes you 400 · Riya owes you 400');
+    await page.click('.modal .btn:has-text("Split")');
+    assert.equal(await balance('Adarsh'), 'Adarsh owes you 400');
+    assert.equal(await balance('Riya'), 'Riya owes you 475');
+    assert.match(await item('Adarsh', 'dinner').textContent(), /split/);
+    await page.click('.toast:has-text("Split 1200") .toast-action');
+    assert.equal(await balance('Adarsh'), 'All square');
+    assert.equal(await balance('Riya'), 'Riya owes you 75');
+  });
+
+  it('Split a bill: percent that does not add up cannot be saved', async () => {
+    const d = (sel) => page.locator(`.split-dialog ${sel}`);
+    await page.click('.tab-view [data-act="split"]');
+    await d('input[aria-label="Total"]').fill('100');
+    await d('[data-method="percent"]').click();
+    assert.deepEqual(await d('.split-share').allTextContents(), ['33.34', '33.33', '33.33'], 'starts evenly at 100%');
+    await d('input[aria-label="Me\'s part"]').fill('50');
+    await d('input[aria-label="Adarsh\'s part"]').fill('40');
+    await d('input[aria-label="Riya\'s part"]').fill('0');
+    assert.equal(await d('.split-status').textContent(), 'Adds up to 90%, needs 100%');
+    assert.equal(await page.locator('.modal .btn.primary').isDisabled(), true);
+    await page.click('.modal .btn:has-text("Cancel")');
+  });
+
+  it('Split a bill: when Adarsh pays, by shares, only your share goes on his list', async () => {
+    const d = (sel) => page.locator(`.split-dialog ${sel}`);
+    await page.click('.tab-view [data-act="split"]');
+    await d('input[aria-label="What was it for"]').fill('cab');
+    await d('input[aria-label="Total"]').fill('90');
+    await d('select[aria-label="Paid by"]').selectOption({ label: 'Adarsh' });
+    await d('[data-method="shares"]').click();
+    await d('input[aria-label="Include Riya"]').uncheck();
+    await d('input[aria-label="Me\'s part"]').fill('2');
+    assert.deepEqual(await d('.split-share').allTextContents(), ['60', '30', '']);
+    assert.equal(await d('.split-recorded').textContent(), 'Adds: you owe Adarsh 60');
+    await page.keyboard.press('Enter');
+    assert.equal(await balance('Adarsh'), 'You owe Adarsh 60');
+    assert.equal(await balance('Riya'), 'Riya owes you 75', 'Riya was not in this split');
+    assert.match(await item('Adarsh', 'cab').locator('.tab-amt').getAttribute('class'), /money-out/);
+    await item('Adarsh', 'cab').click();
+    assert.match(await page.textContent('.tab-dialog'), /Your share of 90, split 2 ways \(shares\)/);
+    await page.click('.modal .btn:has-text("Done")');
+  });
+
   it('everything survives a reload, and item names are searchable', async () => {
     await waitSaved(page);
     await page.reload();
     await page.waitForSelector('.tab-view');
-    assert.equal(await balance('Adarsh'), 'All square');
+    assert.equal(await balance('Adarsh'), 'You owe Adarsh 60');
     assert.equal(await balance('Riya'), 'Riya owes you 75');
     const hit = (await api(server.url, 'GET', '/search?q=biryaani')).json;
     assert.equal(hit[0]?.title, 'Tab', 'paid and combined items are still searchable');

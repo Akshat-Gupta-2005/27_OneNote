@@ -12,7 +12,7 @@ On Windows, double-click **`start.bat`**. It installs dependencies on first run,
 npm install
 npm start          # http://127.0.0.1:3000
 npm run dev        # same, restarts on server file changes
-npm test           # 117 browser + API tests against throwaway servers (uses your installed Chrome or Edge)
+npm test           # 121 browser + API tests against throwaway servers (uses your installed Chrome or Edge)
 npm run backup     # consistent snapshot of the database into backups/
 ```
 
