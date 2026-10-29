@@ -9,11 +9,12 @@ what gets built in what sequence, and why. Task statuses are edited in place:
 *Rewritten 2026-10-17.*
 
 - **Done:** W0, W1, W2.1–2.4, W3.2 (templates + planner), W3.3 (Road to Sabre), W3.4 (Theme tab), and
-  W3.5 (note templates moved to Insert, Cards board, keyboard audit + P13 fix), and **W3.6 (movable
-  everything, consistent across page kinds)**. `npm test`: 98 tests, 63.6 s, 30 of 30 guards proven
-  by removal.
+  W3.5 (note templates moved to Insert, Cards board, keyboard audit + P13 fix), W3.6 (movable
+  everything, consistent across page kinds), W3.7 (planner tidy-up: + add boxes, checked last,
+  tags A→Z), and **W3.8 (`start.bat` launcher; "No month" group)**. `npm test`: 107 tests, 78.0 s,
+  36 of 36 guards proven by removal.
 - **Reload open browser tabs.** No server restart needed (frontend-only change).
-- **Next:** the owner's next customization (W3.7+). W2.5 (tests for the 33 `Written` features) can
+- **Next:** the owner's next customization (W3.9+). W2.5 (tests for the 33 `Written` features) can
   run alongside.
 - **Waiting on a human:** the next customization; eventually OD4 (reachable from a phone?).
 
@@ -99,7 +100,9 @@ time rather than as one up-front list.
 | 3.4 | Done 2026-10-16 | **Theme tab** (owner's request): color schemes, make-your-own theme, and "various looks". Acceptance: `tests/theme.test.mjs` (13) passes; the 6 new guards fail with their fix removed; screenshots of Arctic + Modern, Paper + Cozy, Nightshade and Rose + Modern on the planner, and the editor during an unreadable preview (which found P11). |
 | 3.5 | Done 2026-10-17 | **Owner feedback round:** (a) move the four note templates from "Add page" to Insert so they go into the current page; (b) make every keyboard shortcut work ("delete was not working"); (c) a **Cards** template like the Trello reference image. Acceptance: `templates.test.mjs` (7), `shortcuts.test.mjs` (19, presses all 30 listed shortcuts), `board.test.mjs` (11) pass; P13 reproduced first, then fixed; 7 new guards fail with their fix removed. |
 | 3.6 | Done 2026-10-17 | **Consistency and movability** (owner: "consistency in features across all 3 templates… drag drop reordering for tasks in the to do list and also for lists in the cards template"). Acceptance: `moving.test.mjs` (13) and the new nudge test in `shortcuts.test.mjs` pass; Help lists 36 shortcuts; 8 new guards fail with their fix removed; grip handles checked in screenshots of a planner and a board. |
-| 3.7 | Planned | Next owner request. |
+| 3.7 | Done 2026-10-17 | **Planner tidy-up** (owner, with a screenshot of the cluttered Tag view): replace each add box + Add button with a small + beside the heading; sort A→Z by default; checked items at the end, each half keeping its order. Acceptance: `planner-order.test.mjs` (8) passes, plus the updated planner/moving/shortcut suites; 5 new guards fail with their fix removed; screenshot of Tag view with one box open. |
+| 3.8 | Done 2026-10-17 | **`start.bat` launcher** (double-click, absolute path so a Desktop copy works; installs deps, finds a free port from 3000, opens the browser, or opens the running app) and a **"No month" group** in the planner's Month view. Acceptance: launcher run three ways (fresh, already running, port 3000 taken) from a scratch data dir and from another folder; `todo.test.mjs` No month tests pass and fail with the group hidden when empty. |
+| 3.9 | Planned | Next owner request. |
 
 **Not included:** anything that adds a build step or a second process without a decisions-log row
 justifying it (system guide §8, habit 3).

@@ -41,7 +41,7 @@
 <body>
 <main>
 <h1>OneNote Clone · Architecture</h1>
-<p class="sub">v6 — 2026-10-17 (latest) · 28 Mermaid diagrams generated from <code>docs/7_uml/</code> + 1 master diagram · prose: <a href="6_system-guide.md">6_system-guide.md</a></p>
+<p class="sub">v8 — 2026-10-17 (night) · 29 Mermaid diagrams generated from <code>docs/7_uml/</code> + 1 master diagram · prose: <a href="6_system-guide.md">6_system-guide.md</a></p>
 <nav>
   <a href="#master">0 Master</a><a href="#s7-1_hld">7.1 hld</a><a href="#s7-2_lld">7.2 lld</a><a href="#s7-3_data-model">7.3 data-model</a><a href="#s7-4_sequences">7.4 sequences</a><a href="#s7-5_state-machines">7.5 state-machines</a><a href="#s7-6_activity">7.6 activity</a><a href="#changes">Changes</a>
 </nav>
@@ -431,7 +431,7 @@ classDiagram
     +done : boolean
     +doneAt : number|null
     +tag : string|null
-    +month : "YYYY-MM"|null "null = Unscheduled"
+    +month : "YYYY-MM"|null "null = No month"
     +date : "YYYY-MM-DD"|null "must lie inside month"
     +created : number
   }
@@ -693,7 +693,7 @@ sequenceDiagram
 </section>
 
 <section id="s7-5_state-machines">
-<p class="src">Source: <a href="7_uml/7.5_state-machines.md">7_uml/7.5_state-machines.md</a> · 4 diagrams</p>
+<p class="src">Source: <a href="7_uml/7.5_state-machines.md">7_uml/7.5_state-machines.md</a> · 5 diagrams</p>
 <h2>7.5 State machines</h2>
 <h3>Save status (the title-bar indicator)</h3>
 <p>Values are the strings <code>PageEditor</code> emits as <code>status</code> events.</p>
@@ -740,9 +740,22 @@ stateDiagram-v2
   eraser --&gt; type : Esc / modeType / load(page)
 </pre><noscript><p class="note">Diagram source shown above — JavaScript is off.</p></noscript></div>
 <p>In any mode other than <code>type</code>, the ink SVG takes pointer events (class <code>draw</code> on <code>#pageInner</code>), so containers cannot be clicked. Opening another page always returns to <code>type</code>. A pen's eraser end (<code>pointerdown</code> with <code>button === 5</code>) erases even in <code>pen</code> mode.</p>
+<h3>Planner add box (since 2026-10-17)</h3>
+<p>One per page view (<code>openAdd</code> in <code>todo.js</code>). Never stored.</p>
+<div class="diagram" id="s7-5_state-machines-4"><pre class="mermaid">
+stateDiagram-v2
+  [*] --&gt; closed
+  closed --&gt; open : click + (or title Enter / ↓ for the first group)
+  open --&gt; open : Enter with text → task added, box cleared
+  open --&gt; open : click another group's + (that box opens instead)
+  open --&gt; closed : Esc (focus → +)
+  open --&gt; closed : blur while empty, after the click lands
+  open --&gt; open : blur with text (kept)
+</pre><noscript><p class="note">Diagram source shown above — JavaScript is off.</p></noscript></div>
+<p><strong>Why "after the click lands":</strong> focus leaves on <code>pointerdown</code>; removing the box then would shift the rows below it before <code>pointerup</code>, and the click would miss (decisions, 2026-10-17).</p>
 <h3>Card due badge (since 2026-10-17)</h3>
 <p>Computed by <code>dueState()</code> in <code>board.js</code> on every render, from <code>due</code>, <code>dueDone</code> and today's date.</p>
-<div class="diagram" id="s7-5_state-machines-4"><pre class="mermaid">
+<div class="diagram" id="s7-5_state-machines-5"><pre class="mermaid">
 stateDiagram-v2
   [*] --&gt; none : due = null
   none --&gt; later : set due beyond tomorrow
@@ -805,7 +818,7 @@ flowchart TD
 <h3>Where a new planner task lands</h3>
 <div class="diagram" id="s7-6_activity-3"><pre class="mermaid">
 flowchart TD
-  IN(["Enter in an add box&lt;br/&gt;of group g"]) --&gt; P["parseQuickAdd(raw, {defaultMonth: g.month})"]
+  IN(["Enter in the add box of group g&lt;br/&gt;(opened by its +)"]) --&gt; P["parseQuickAdd(raw, {defaultMonth: g.month})"]
   P --&gt; TXT{"text left after&lt;br/&gt;removing #tag / @date?"}
   TXT --&gt;|no| T0(["toast: type the task itself"])
   TXT --&gt;|yes| TAG["tag = parsed.tag ?? g.tag ?? null"]
@@ -818,7 +831,7 @@ flowchart TD
   MOV --&gt;|yes| TO(["toast: Added to November (20 Nov)"])
   MOV --&gt;|no| DONE(["focus stays in the same add box"])
 </pre><noscript><p class="note">Diagram source shown above — JavaScript is off.</p></noscript></div>
-<p>Group kinds that set defaults: a month group (<code>g.month</code>), a date group (<code>g.date</code>, <code>g.month</code>), a tag group (<code>g.tag</code>), "No date" / "No tag" / "Unscheduled" (nothing), and the top add box in Date and Tag views (nothing). The Overdue group has no add box.</p>
+<p>Group kinds that set defaults: a month group (<code>g.month</code>), a date group (<code>g.date</code>, <code>g.month</code>), a tag group (<code>g.tag</code>), and "No date" / "No tag" / "No month" (nothing; key <code>unscheduled</code>). The Overdue group has no +. The top add box in Date and Tag views was removed on 2026-10-17; "No date" and "No tag" do its job.</p>
 <h3>Where a dropped planner task lands</h3>
 <div class="diagram" id="s7-6_activity-4"><pre class="mermaid">
 flowchart TD
@@ -835,7 +848,7 @@ flowchart TD
   D --&gt; POS
   ND --&gt; POS
   T --&gt; POS
-  POS["splice t out of data.tasks;&lt;br/&gt;insert before the task under the pointer,&lt;br/&gt;else after g's last task"] --&gt; SAVE(["render, refocus t, scheduleSave()"])
+  POS["splice t out of data.tasks;&lt;br/&gt;insert before the task under the pointer&lt;br/&gt;with the same checked state,&lt;br/&gt;else after g's last task"] --&gt; SAVE(["render, refocus t, scheduleSave()"])
 </pre><noscript><p class="note">Diagram source shown above — JavaScript is off.</p></noscript></div>
 <p><code>applyGroup()</code> + <code>moveTask()</code> in <code>todo.js</code>. Alt+↑/↓ is the same move with "before" = the neighbouring task; Alt+←/→ is a drop at the end of the previous/next non-Overdue group.</p>
 <h3>Paste into a container</h3>
@@ -862,8 +875,10 @@ flowchart TD
   <tr><td><a href="8_architecture.v2.html">v2 — 2026-10-15 (session 3)</a></td><td>Page templates and the to-do planner: <code>todo.js</code> and <code>templates.js</code> in the component diagram, a <code>TodoView</code> class, the planner content shape (7.3), a template + add-task sequence (7.4), the "where a new task lands" activity (7.6), and <code>npm test</code> in the container diagram (7.1).</td></tr>
   <tr><td><a href="8_architecture.v4.html">v4 — 2026-10-17</a></td><td>Cards board and insert templates: <code>board.js</code> + <code>BoardView</code> and the editor's <code>views</code> interface (7.2), the board content shape (7.3), the Insert → Templates sequence (7.4), and the card due-badge state machine (7.5). Master diagram: editor label names <code>board.js</code>.</td></tr>
   <tr><td><a href="8_architecture.v5.html">v5 — 2026-10-17 (later)</a></td><td>Board backgrounds follow the theme: the board content shape (7.3) lists <code>tint · accent · soft · page</code> instead of fixed gradients.</td></tr>
+  <tr><td><a href="8_architecture.v6.html">v6 — 2026-10-17 (latest)</a></td><td>Movable everything: <code>board.js</code> uses <code>parseQuickAdd()</code> from <code>todo.js</code> (7.2); new activity "where a dropped planner task lands" (7.6).</td></tr>
+  <tr><td><a href="8_architecture.v7.html">v7 — 2026-10-17 (evening)</a></td><td>Planner tidy-up: + add box state machine (7.5); drops land among tasks with the same checked state (7.6).</td></tr>
   <tr><td><a href="8_architecture.v3.html">v3 — 2026-10-16</a></td><td>Theme tab: <code>theme.js</code> in the component diagram (7.2), the <code>settings.appearance</code> shape (7.3) and the first-paint sequence (7.4).</td></tr>
-  <tr><td>v6 — 2026-10-17 (latest) (this page)</td><td>Movable everything: <code>board.js</code> now uses <code>parseQuickAdd()</code> from <code>todo.js</code> (7.2), and a new activity shows where a dropped planner task lands (7.6).</td></tr>
+  <tr><td>v8 — 2026-10-17 (night) (this page)</td><td>Unscheduled is now shown as "No month" (7.3 task shape, 7.6 group kinds); no shape change.</td></tr>
 </table>
 </section>
 </main>

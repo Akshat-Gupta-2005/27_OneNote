@@ -12,16 +12,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const UML = path.join(ROOT, 'docs', '7_uml');
 const OUT = path.join(ROOT, 'docs', '8_architecture.html');
 const MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js';
-const VERSION = 'v6 — 2026-10-17 (latest)';
+const VERSION = 'v8 — 2026-10-17 (night)';
 // Earlier versions are kept as files beside the current page, never overwritten.
 const HISTORY = [
   ['v1 — 2026-10-15', '8_architecture.v1.html', 'First version: clone, docs, backup.'],
   ['v2 — 2026-10-15 (session 3)', '8_architecture.v2.html', 'Page templates and the to-do planner: <code>todo.js</code> and <code>templates.js</code> in the component diagram, a <code>TodoView</code> class, the planner content shape (7.3), a template + add-task sequence (7.4), the "where a new task lands" activity (7.6), and <code>npm test</code> in the container diagram (7.1).'],
   ['v4 — 2026-10-17', '8_architecture.v4.html', 'Cards board and insert templates: <code>board.js</code> + <code>BoardView</code> and the editor\'s <code>views</code> interface (7.2), the board content shape (7.3), the Insert → Templates sequence (7.4), and the card due-badge state machine (7.5). Master diagram: editor label names <code>board.js</code>.'],
   ['v5 — 2026-10-17 (later)', '8_architecture.v5.html', 'Board backgrounds follow the theme: the board content shape (7.3) lists <code>tint · accent · soft · page</code> instead of fixed gradients.'],
+  ['v6 — 2026-10-17 (latest)', '8_architecture.v6.html', 'Movable everything: <code>board.js</code> uses <code>parseQuickAdd()</code> from <code>todo.js</code> (7.2); new activity "where a dropped planner task lands" (7.6).'],
+  ['v7 — 2026-10-17 (evening)', '8_architecture.v7.html', 'Planner tidy-up: + add box state machine (7.5); drops land among tasks with the same checked state (7.6).'],
   ['v3 — 2026-10-16', '8_architecture.v3.html', 'Theme tab: <code>theme.js</code> in the component diagram (7.2), the <code>settings.appearance</code> shape (7.3) and the first-paint sequence (7.4).'],
 ];
-const CHANGES = 'Movable everything: <code>board.js</code> now uses <code>parseQuickAdd()</code> from <code>todo.js</code> (7.2), and a new activity shows where a dropped planner task lands (7.6).';
+const CHANGES = 'Unscheduled is now shown as "No month" (7.3 task shape, 7.6 group kinds); no shape change.';
 
 const FILES = ['7.1_hld.md', '7.2_lld.md', '7.3_data-model.md', '7.4_sequences.md', '7.5_state-machines.md', '7.6_activity.md'];
 

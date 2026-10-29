@@ -126,6 +126,7 @@ the banner.
 Run from the repo root. Git Bash syntax; the same commands work in PowerShell except where noted.
 
 ```bash
+start.bat                                     # Windows double-click: install if needed, free port from 3000 up, open browser
 npm install                                   # once
 npm start                                     # → OneNote Clone running at http://127.0.0.1:3000
 npm run dev                                   # same, restarts when server files change
@@ -222,7 +223,8 @@ Only failures actually seen are listed here.
 | **Canvas page** / freeform page | Every other page: containers + ink. `editor.kind === 'canvas'`. |
 | **Quick-add** | The add-box syntax shared by the planner and Cards (`parseQuickAdd()` in `todo.js`): `#tag` (Cards: `#label`, a color or a label name) and `@date` (`@today`, `@sat`, `@20 Oct`, `@3/11`). |
 | **Grip** | The six-dot handle shown on hover: drag a planner task by it; a Cards list drags by its whole header. Keyboard twin: Alt+arrows. |
-| **Group** (planner) | A month, date or tag heading in the planner. Computed from task fields, so dropping a task into a group sets those fields (`applyGroup()`). |
+| **Group** (planner) | A month, date or tag heading in the planner. Computed from task fields, so dropping a task into a group sets those fields (`applyGroup()`). Tags are listed A→Z. Month view always ends with "No month" (`month: null`; internal key `unscheduled`). Inside a group, checked tasks are drawn last; the stored order is unchanged. |
+| **+ / add box** (planner) | The + beside a group heading opens that group's add box (`openAdd`, one at a time). Not stored; every page load starts with all boxes closed. |
 | **Template** | A recipe in `templates.js` that returns a filled page (`title`, `content`, `text`) for `POST /api/pages`. Not stored anywhere after creation. |
 | **Scheme** / color scheme | 8 seed colors + a Dark/Light base. All other colors are derived (`deriveTokens()` in `theme.js`), except Classic Dark/Light, which use the hand-tuned tokens in `app.css`. |
 | **Look** | Layout settings independent of color: density, corners, UI font, page style, section-tab style. Applied as `data-*` attributes on `<html>`. |

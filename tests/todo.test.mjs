@@ -68,8 +68,9 @@ describe('to-do planner', () => {
     await page.waitForSelector('.todo-view');
     assert.equal(await page.textContent('#pageTitle'), 'To-do planner');
     const heads = await page.$$eval('.todo-group-head h3', (e) => e.map((x) => x.textContent));
-    assert.equal(heads.length, 3);
+    assert.equal(heads.length, 4, 'three months + No month');
     assert.equal(heads[0], monthName(new Date()));
+    assert.equal(heads[3], 'No month', 'No month is always there, even when empty');
     assert.equal(await page.textContent('.todo-month .todo-badge'), 'NOW');
     assert.match(await progress(), /0 of 0 done\s*0%/);
     assert.equal(await page.locator('.nb').count(), 0, 'no freeform containers on a to-do page');
@@ -193,7 +194,16 @@ describe('to-do planner', () => {
     assert.equal(r.json[0].title, 'To-do planner');
   });
 
-  it('adds a month, and removing a month with tasks moves them to Unscheduled', async () => {
+  it('No month takes tasks without a month and sits below Add month', async () => {
+    await add('unscheduled', 'Someday maybe');
+    assert.deepEqual(await page.$$eval('.todo-unscheduled .todo-text', (e) => e.map((x) => x.textContent)), ['Someday maybe']);
+    assert.equal(await page.$eval('.todo-add-month', (b) => b.nextElementSibling.matches('.todo-unscheduled')), true);
+    await page.focus('.todo-task:has-text("Someday maybe") .todo-text');
+    await page.keyboard.press('Delete');
+    assert.equal(await page.locator('.todo-unscheduled .todo-task').count(), 0);
+  });
+
+  it('adds a month, and removing a month with tasks moves them to No month', async () => {
     const before = await page.locator('.todo-month').count();
     await page.click('[data-act="add-month"]');
     assert.equal(await page.locator('.todo-month').count(), before + 1);

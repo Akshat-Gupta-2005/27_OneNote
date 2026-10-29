@@ -401,7 +401,7 @@ export class TodoView {
     this.refocusKey = group.key;
     this.change();
     if (this.prefs.view === 'month' && group.kind === 'month' && task.month !== group.month) {
-      toast(`Added to ${task.month ? monthTitle(task.month) : 'Unscheduled'} (${fmtShort(task.date)})`);
+      toast(`Added to ${task.month ? monthTitle(task.month) : 'No month'} (${fmtShort(task.date)})`);
     }
     return true;
   }
@@ -478,8 +478,8 @@ export class TodoView {
       sub: m.sub || monthRange(m.key), badge: m.key === cur ? 'NOW' : null,
       tasks: tasks.filter((t) => t.month === m.key), add: `Add a task to ${monthTitle(m.key)}`,
     }));
-    const unscheduled = tasks.filter((t) => !t.month);
-    if (unscheduled.length) out.push({ kind: 'unscheduled', key: 'unscheduled', title: 'Unscheduled', tasks: unscheduled, add: 'Add an unscheduled task' });
+    // Always shown, so a task can be parked without picking a month (internally still 'unscheduled').
+    out.push({ kind: 'unscheduled', key: 'unscheduled', title: 'No month', tasks: tasks.filter((t) => !t.month), add: 'Add a task without a month' });
     return out;
   }
 
@@ -521,10 +521,9 @@ export class TodoView {
     this.groupMap = new Map();
     for (const g of this.groups()) {
       this.groupMap.set(g.key, g);
+      // "Add month" sits under the last month, above No month.
+      if (g.kind === 'unscheduled') parts.push(h('button', { class: 'todo-add-month', 'data-act': 'add-month' }, h('span', { html: svg('plus', 16) }), 'Add month'));
       parts.push(this.groupEl(g, hideDone));
-    }
-    if (view === 'month') {
-      parts.push(h('button', { class: 'todo-add-month', 'data-act': 'add-month' }, h('span', { html: svg('plus', 16) }), 'Add month'));
     }
     if (this.openAdd && !this.groupMap.get(this.openAdd)?.add) this.openAdd = null; // its group is gone
     this.body.replaceChildren(...parts);
@@ -786,7 +785,7 @@ export class TodoView {
             }),
           })),
           task.month ? { separator: true } : null,
-          task.month ? { label: 'Unscheduled', onClick: live(() => { task.month = null; task.date = null; this.change(); }) } : null,
+          task.month ? { label: 'No month', onClick: live(() => { task.month = null; task.date = null; this.change(); }) } : null,
         ],
       },
       { label: task.done ? 'Mark not done' : 'Mark done', icon: 'check', onClick: live(() => { task.done = !task.done; task.doneAt = task.done ? Date.now() : null; this.change(); }) },
@@ -811,7 +810,7 @@ export class TodoView {
       {
         label: 'Remove month', icon: 'trash', danger: true,
         onClick: async () => {
-          if (count && !(await confirmDialog('Remove month?', `${count} task${count === 1 ? '' : 's'} in ${monthTitle(key)} will move to Unscheduled and lose their dates.`, { okLabel: 'Remove month' }))) return;
+          if (count && !(await confirmDialog('Remove month?', `${count} task${count === 1 ? '' : 's'} in ${monthTitle(key)} will move to No month and lose their dates.`, { okLabel: 'Remove month' }))) return;
           if (this.pageId !== pid) return;
           for (const t of this.data.tasks) if (t.month === key) { t.month = null; t.date = null; }
           this.data.months = this.data.months.filter((x) => x.key !== key);
@@ -829,7 +828,7 @@ export class TodoView {
       return `<h2>${esc(monthTitle(m.key))} <small>${esc(m.sub || monthRange(m.key))}</small></h2>${m.note ? `<p>${esc(m.note)}</p>` : ''}<ul>${list.map(item).join('')}</ul>`;
     });
     const unscheduled = d.tasks.filter((t) => !t.month);
-    if (unscheduled.length) sections.push(`<h2>Unscheduled</h2><ul>${unscheduled.map(item).join('')}</ul>`);
+    if (unscheduled.length) sections.push(`<h2>No month</h2><ul>${unscheduled.map(item).join('')}</ul>`);
     const done = d.tasks.filter((t) => t.done).length;
     return `${d.eyebrow ? `<p class="meta">${esc(d.eyebrow)}</p>` : ''}<h1 class="page-title">${esc(title)}</h1>${d.subtitle ? `<p>${esc(d.subtitle)}</p>` : ''}<p class="meta">${done} of ${d.tasks.length} done</p>${sections.join('\n')}`;
   }
